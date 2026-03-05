@@ -743,7 +743,7 @@ svgEl_root.addEventListener('pointerup', async (e) => {
 
   if (reorderIndicator) { reorderIndicator.remove(); reorderIndicator = null; }
 
-  if (!ds.hasMoved) return;  // pure click — let click handler fire
+  if (!ds.hasMoved) { openEditTaskModal(ds.tid); return; }
 
   if (ds.type === 'reorder-group') {
     const ids = state.groups.map(g => g.id);
