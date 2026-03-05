@@ -1,0 +1,43 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+       background: #f8f9fa; color: #333; }
+
+.toolbar { display: flex; align-items: center; justify-content: space-between;
+           padding: 12px 20px; background: #fff; border-bottom: 1px solid #e0e0e0;
+           position: sticky; top: 0; z-index: 10; }
+
+.toolbar__title { font-size: 20px; font-weight: 600; }
+.toolbar__actions { display: flex; gap: 8px; }
+
+.btn { padding: 7px 16px; border: 1px solid #ccc; border-radius: 6px;
+       background: #fff; cursor: pointer; font-size: 14px; }
+.btn:hover { background: #f0f0f0; }
+.btn--primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+.btn--primary:hover { background: #1d4ed8; }
+.btn--danger { background: #dc2626; color: #fff; border-color: #dc2626; }
+
+.legend { display: flex; gap: 16px; padding: 10px 20px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+.chart-container { overflow-x: auto; padding: 0 20px 20px; }
+#roadmap-svg { display: block; min-width: 100%; }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+                 display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal-overlay.hidden { display: none; }
+.modal { background: #fff; border-radius: 10px; padding: 24px; min-width: 360px; max-width: 480px; width: 100%; }
+.modal h2 { margin-bottom: 16px; font-size: 18px; }
+.modal-field { margin-bottom: 14px; }
+.modal-field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.modal-field input { width: 100%; padding: 8px 10px; border: 1px solid #ccc;
+                     border-radius: 6px; font-size: 14px; }
+.modal__actions { display: flex; gap: 8px; margin-top: 20px; }
+
+.toast { position: fixed; bottom: 24px; right: 24px; padding: 10px 18px;
+         border-radius: 8px; font-size: 14px; z-index: 200; animation: fadeIn .2s; }
+.toast--error { background: #dc2626; color: #fff; }
+.toast--ok    { background: #16a34a; color: #fff; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }

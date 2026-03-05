@@ -1,0 +1,31 @@
+title: My Project Roadmap
+start: '2025-01-01'
+end: '2025-12-31'
+groups:
+- id: phase1
+  name: Foundation Setup
+  color: '#4CAF50'
+  collapsed: false
+  tasks:
+  - id: task1
+    name: Basic setup
+    start: '2025-01-01'
+    end: '2025-02-15'
+  - id: task2
+    name: ISMS documentation
+    start: '2025-01-15'
+    end: '2025-03-01'
+- id: phase2
+  name: Advanced Modules
+  color: '#1e994d'
+  collapsed: false
+  tasks:
+  - id: task3
+    name: Online assessments
+    start: '2025-04-01'
+    end: '2025-04-30'
+- id: phase_3_59ae9a
+  name: Phase 3
+  color: '#4caf50'
+  collapsed: false
+  tasks: []
