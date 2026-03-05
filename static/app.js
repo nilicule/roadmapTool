@@ -795,6 +795,7 @@ function showTaskPopup(tid) {
   if (!task) return;
   const pos = barPos[tid];
   if (!pos) return;
+  if (pos.w === 0) return;  // skip milestones
   const popup = document.getElementById('task-popup');
   const container = document.querySelector('.chart-container');
 
