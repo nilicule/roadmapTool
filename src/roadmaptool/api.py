@@ -147,6 +147,7 @@ class TaskCreate(BaseModel):
     assignee: str | None = None
     depends_on: list[str] = []
     progress: int | None = None
+    tags: list[str] = []
 
 
 class TaskUpdate(BaseModel):
@@ -156,6 +157,7 @@ class TaskUpdate(BaseModel):
     assignee: str | None = None
     depends_on: list[str] = []
     progress: int | None = None
+    tags: list[str] = []
 
 
 @router.post("/groups/{gid}/tasks")
@@ -163,7 +165,9 @@ def add_task(gid: str, body: TaskCreate):
     rm = _load()
     for g in rm.groups:
         if g.id == gid:
-            task = Task(id=_slug(body.name), name=body.name, start=body.start, end=body.end, assignee=body.assignee, depends_on=body.depends_on, progress=body.progress)
+            task = Task(id=_slug(body.name), name=body.name, start=body.start, end=body.end,
+                        assignee=body.assignee, depends_on=body.depends_on,
+                        progress=body.progress, tags=body.tags)
             g.tasks.append(task)
             _save(rm)
             return task.model_dump(mode="json")
@@ -182,6 +186,7 @@ def update_task(tid: str, body: TaskUpdate):
                 t.assignee = body.assignee
                 t.depends_on = body.depends_on
                 t.progress = body.progress
+                t.tags = body.tags
                 _save(rm)
                 return t.model_dump(mode="json")
     raise HTTPException(status_code=404, detail=f"Task {tid!r} not found")

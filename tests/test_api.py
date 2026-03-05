@@ -109,3 +109,37 @@ def test_update_task_depends_on_omitted_defaults_empty(client):
 def test_validation_error_returns_422(client):
     resp = client.post("/api/groups", json={"name": "X", "color": "notahex"})
     assert resp.status_code == 422
+
+
+def test_add_task_with_tags(client):
+    groups = client.get("/api/roadmap").json()["groups"]
+    gid = groups[0]["id"]
+    resp = client.post(f"/api/groups/{gid}/tasks", json={
+        "name": "Tagged Task", "start": "2026-03-01", "end": "2026-03-31",
+        "tags": ["security", "backend"]
+    })
+    assert resp.status_code == 200
+    assert resp.json()["tags"] == ["security", "backend"]
+
+
+def test_update_task_tags(client):
+    roadmap = client.get("/api/roadmap").json()
+    task = roadmap["groups"][0]["tasks"][0]
+    tid = task["id"]
+    resp = client.put(f"/api/tasks/{tid}", json={
+        "name": task["name"], "start": task["start"], "end": task["end"],
+        "tags": ["infra"]
+    })
+    assert resp.status_code == 200
+    assert resp.json()["tags"] == ["infra"]
+
+
+def test_update_task_tags_omitted_defaults_empty(client):
+    roadmap = client.get("/api/roadmap").json()
+    task = roadmap["groups"][0]["tasks"][0]
+    tid = task["id"]
+    resp = client.put(f"/api/tasks/{tid}", json={
+        "name": task["name"], "start": task["start"], "end": task["end"]
+    })
+    assert resp.status_code == 200
+    assert resp.json()["tags"] == []
