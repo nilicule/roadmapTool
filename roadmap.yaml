@@ -23,6 +23,14 @@ groups:
     depends_on: []
     progress:
     tags: []
+  - id: operations_93e07c
+    name: Operations
+    start: '2026-05-01'
+    end: '2026-05-31'
+    assignee:
+    depends_on: []
+    progress:
+    tags: []
   depends_on: []
 - id: engie_be_424b2a
   name: Engie BE
@@ -39,12 +47,68 @@ groups:
 - id: security_privacy_f84a73
   name: Security & Privacy
   color: '#349d3b'
-  collapsed: true
-  tasks: []
+  collapsed: false
+  tasks:
+  - id: dependency_vulnerability_scanning_1c3c81
+    name: Dependency vulnerability scanning
+    start: '2026-04-01'
+    end: '2026-06-30'
+    assignee:
+    depends_on: []
+    progress:
+    tags: []
+  - id: automated_sast_dast_4d368d
+    name: Automated SAST/DAST
+    start: '2026-04-01'
+    end: '2026-06-30'
+    assignee:
+    depends_on: []
+    progress:
+    tags: []
+  - id: post_incident_review_process_fbc5c5
+    name: Post-incident review process
+    start: '2026-04-01'
+    end: '2026-06-30'
+    assignee:
+    depends_on: []
+    progress:
+    tags: []
+  - id: aws_security_baseline_enforcement_166407
+    name: AWS Security baseline enforcement
+    start: '2026-04-01'
+    end: '2026-06-30'
+    assignee:
+    depends_on: []
+    progress:
+    tags: []
+  - id: threat_modelling_e91fc1
+    name: Threat modelling
+    start: '2026-04-01'
+    end: '2026-06-30'
+    assignee:
+    depends_on: []
+    progress:
+    tags: []
   depends_on: []
 - id: incident_handling_7237a5
   name: Incident handling
   color: '#9c27b0'
   collapsed: false
-  tasks: []
+  tasks:
+  - id: define_ticketing_strategy_d02604
+    name: Define ticketing strategy
+    start: '2026-03-09'
+    end: '2026-03-31'
+    assignee:
+    depends_on: []
+    progress:
+    tags: []
+  - id: implement_ticketing_strategy_391709
+    name: Implement ticketing strategy
+    start: '2026-04-01'
+    end: '2026-04-30'
+    assignee:
+    depends_on: []
+    progress:
+    tags: []
   depends_on: []

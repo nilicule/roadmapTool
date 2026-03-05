@@ -37,6 +37,19 @@ let selectedTid = null;
 function parseDate(s) { return new Date(s + 'T00:00:00'); }
 function daysDiff(a, b) { return Math.round((b - a) / 86400000); }
 function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+// Expand "MM/YYYY" shorthand to a full YYYY-MM-DD date.
+// isEnd=true → last day of month; isEnd=false → first day.
+function normalizeDate(str, isEnd = false) {
+  const m = str.trim().match(/^(\d{1,2})\/(\d{4})$/);
+  if (!m) return str.trim();
+  const month = m[1].padStart(2, '0');
+  const year  = m[2];
+  if (isEnd) {
+    const last = new Date(parseInt(year), parseInt(m[1]), 0).getDate();
+    return `${year}-${month}-${String(last).padStart(2, '0')}`;
+  }
+  return `${year}-${month}-01`;
+}
 function tagColor(tag) {
   let h = 0;
   for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) % 360;
@@ -911,6 +924,20 @@ function openModal(title, fields, onSave, onDelete = null) {
     if (f.type === 'textarea') {
       div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
         <textarea id="field-${f.name}" name="${f.name}" placeholder="${f.placeholder || ''}" rows="8"></textarea>`;
+    } else if (f.type === 'date') {
+      div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
+        <div style="display:flex;gap:4px;align-items:center">
+          <input id="field-${f.name}" name="${f.name}" type="text"
+                 value="${f.value || ''}" placeholder="YYYY-MM-DD or MM/YYYY"${f.required !== false ? ' required' : ''}>
+          <button type="button" class="btn btn--icon" title="Pick date"
+                  onclick="this.nextElementSibling.showPicker()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </button>
+          <input type="date" style="width:0;height:0;opacity:0;pointer-events:none;position:absolute"
+                 onchange="document.getElementById('field-${f.name}').value=this.value">
+        </div>`;
     } else if (f.type === 'select') {
       const opts = (f.options || [])
         .map(o => `<option value="${o.value}"${o.value === (f.value ?? '') ? ' selected' : ''}>${o.label}</option>`)
@@ -1071,7 +1098,7 @@ function openAddTaskModal(gid) {
     { name: 'tags', label: 'Tags', placeholder: 'security, backend, ...', required: false, value: '' },
   ], async (data) => {
     await api('POST', `/groups/${gid}/tasks`, {
-      name: data.name, start: data.start, end: data.end,
+      name: data.name, start: normalizeDate(data.start), end: normalizeDate(data.end, true),
       assignee: data.assignee || null,
       progress: data.progress !== '' ? parseInt(data.progress) : null,
       tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
@@ -1103,7 +1130,7 @@ function openEditTaskModal(tid) {
     if (data.depends_on && wouldCreateCycle(data.depends_on, tid))
       throw new Error('This dependency would create a cycle');
     await api('PUT', `/tasks/${tid}`, {
-      name: data.name, start: data.start, end: data.end, assignee: data.assignee || null,
+      name: data.name, start: normalizeDate(data.start), end: normalizeDate(data.end, true), assignee: data.assignee || null,
       depends_on: data.depends_on ? [data.depends_on] : [],
       progress: data.progress !== '' ? parseInt(data.progress) : null,
       tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
