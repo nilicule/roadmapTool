@@ -1,4 +1,10 @@
 title: My Awesome Project Roadmap
 start: '2026-01-01'
 end: '2026-12-31'
-groups: []
+groups:
+- id: eramba_255ba7
+  name: Eramba
+  color: '#4caf50'
+  collapsed: false
+  tasks: []
+  depends_on: []

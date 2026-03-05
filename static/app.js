@@ -939,6 +939,8 @@ function openModal(title, fields, onSave, onDelete = null) {
   }
 
   document.getElementById('modal-overlay').classList.remove('hidden');
+  const firstField = fieldsEl.querySelector('input, textarea, select');
+  if (firstField) firstField.focus();
   document.getElementById('modal-form').onsubmit = async (e) => {
     e.preventDefault();
     try {
@@ -1017,10 +1019,15 @@ document.getElementById('modal-overlay').addEventListener('click', (e) => {
 // ============================================================
 // Group modals
 // ============================================================
+function randomGroupColor() {
+  const colors = ['#4CAF50','#2196F3','#9C27B0','#FF5722','#FF9800','#00BCD4','#E91E63','#607D8B'];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
 function openAddGroupModal() {
   openModal('Add Group', [
     { name: 'name', label: 'Group name', placeholder: 'e.g. Phase 1' },
-    { name: 'color', label: 'Color', type: 'color', value: '#4CAF50' },
+    { name: 'color', label: 'Color', type: 'color', value: randomGroupColor() },
   ], async (data) => {
     await api('POST', '/groups', { name: data.name, color: data.color });
   });
