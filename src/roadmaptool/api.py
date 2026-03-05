@@ -85,6 +85,7 @@ class GroupUpdate(BaseModel):
     name: str
     color: str
     collapsed: bool
+    depends_on: list[str] = []
 
 
 @router.post("/groups")
@@ -104,6 +105,7 @@ def update_group(gid: str, body: GroupUpdate):
             g.name = body.name
             g.color = body.color
             g.collapsed = body.collapsed
+            g.depends_on = body.depends_on
             _save(rm)
             return g.model_dump(mode="json")
     raise HTTPException(status_code=404, detail=f"Group {gid!r} not found")
@@ -137,6 +139,7 @@ class TaskCreate(BaseModel):
     start: str
     end: str
     assignee: str | None = None
+    depends_on: list[str] = []
 
 
 class TaskUpdate(BaseModel):
@@ -144,6 +147,7 @@ class TaskUpdate(BaseModel):
     start: str
     end: str
     assignee: str | None = None
+    depends_on: list[str] = []
 
 
 @router.post("/groups/{gid}/tasks")
@@ -151,7 +155,7 @@ def add_task(gid: str, body: TaskCreate):
     rm = _load()
     for g in rm.groups:
         if g.id == gid:
-            task = Task(id=_slug(body.name), name=body.name, start=body.start, end=body.end, assignee=body.assignee)
+            task = Task(id=_slug(body.name), name=body.name, start=body.start, end=body.end, assignee=body.assignee, depends_on=body.depends_on)
             g.tasks.append(task)
             _save(rm)
             return task.model_dump(mode="json")
@@ -168,6 +172,7 @@ def update_task(tid: str, body: TaskUpdate):
                 t.start = date_type.fromisoformat(body.start)
                 t.end = date_type.fromisoformat(body.end)
                 t.assignee = body.assignee
+                t.depends_on = body.depends_on
                 _save(rm)
                 return t.model_dump(mode="json")
     raise HTTPException(status_code=404, detail=f"Task {tid!r} not found")

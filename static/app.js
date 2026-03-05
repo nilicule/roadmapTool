@@ -21,6 +21,9 @@ let state = null;  // Roadmap object from API
 let zoomLevel = 0;    // index into ZOOM_LEVELS; 0 = Year (default)
 let dayW = 0;         // pixels per day (module-level, set in renderSVG)
 let timeStart = null; // Date object (module-level, set in renderSVG)
+let barPos = {};      // tid/gid → { x, y, w, h, midY } for dependency arrows
+let groupYPos = [];   // [{gid, y, h}] for drag-to-reorder
+let reorderIndicator = null; // <line> shown during group reorder drag
 
 // ============================================================
 // Date utilities
@@ -124,8 +127,11 @@ function renderSVG() {
   }
 
   // Groups and tasks
+  barPos = {};
+  groupYPos = [];
   let y = HEADER_H;
   for (const g of state.groups) {
+    const groupStartY = y;
     renderGroup(svg, g, y, svgW);
     y += GROUP_H;
     if (!g.collapsed) {
@@ -134,6 +140,7 @@ function renderSVG() {
         y += TASK_H;
       }
     }
+    groupYPos.push({ gid: g.id, y: groupStartY, h: y - groupStartY });
   }
 
   // Label panel separator
@@ -141,6 +148,8 @@ function renderSVG() {
     x1: LABEL_W, y1: HEADER_H, x2: LABEL_W, y2: totalH,
     stroke: '#e0e0e0', 'stroke-width': 1
   }));
+
+  renderDependencyArrows(svg);
 }
 
 function renderMonthHeaders(svg, timeStart, timeEnd, totalDays, dayW, containerW, totalH) {
@@ -178,10 +187,17 @@ function renderGroup(svg, g, y, containerW) {
   // Color indicator
   svg.appendChild(svgEl('rect', { x: 0, y, width: 4, height: GROUP_H, fill: g.color }));
 
-  // Collapse toggle + group name
+  // Drag handle ≡
+  svg.appendChild(svgEl('text', {
+    x: 8, y: y + GROUP_H / 2 + 5,
+    fill: '#9ca3af', 'font-size': 12, 'text-anchor': 'middle', cursor: 'grab',
+    'data-action': 'reorder-group', 'data-gid': g.id,
+  }, '\u2630'));
+
+  // Collapse toggle + group name (shifted from x:14 → x:20)
   const arrow = g.collapsed ? '▶' : '▼';
   svg.appendChild(svgEl('text', {
-    x: 14, y: y + GROUP_H / 2 + 5,
+    x: 20, y: y + GROUP_H / 2 + 5,
     fill: g.color, 'font-size': 13, 'font-weight': '600', cursor: 'pointer',
     'data-action': 'toggle-group', 'data-gid': g.id
   }, `${arrow} ${g.name}`));
@@ -201,6 +217,25 @@ function renderGroup(svg, g, y, containerW) {
     'text-anchor': 'middle',
     'data-action': 'add-task', 'data-gid': g.id
   }, '+'));
+
+  // Summary bar (collapsed) + barPos for dependency arrows
+  if (g.tasks.length > 0) {
+    const starts = g.tasks.map(t => parseDate(t.start));
+    const ends   = g.tasks.map(t => parseDate(t.end));
+    const minStart = new Date(Math.min(...starts));
+    const maxEnd   = new Date(Math.max(...ends));
+    const gBarX = LABEL_W + daysDiff(timeStart, minStart) * dayW;
+    const gBarW = Math.max(daysDiff(minStart, maxEnd) * dayW, 4);
+    const gBarH = 8;
+    const gBarY = y + (GROUP_H - gBarH) / 2;
+    barPos[g.id] = { x: gBarX, y: gBarY, w: gBarW, h: gBarH, midY: gBarY + gBarH / 2 };
+    if (g.collapsed) {
+      svg.appendChild(svgEl('rect', {
+        x: gBarX, y: gBarY, width: gBarW, height: gBarH,
+        rx: 3, fill: hexToRgba(g.color, 0.5), 'pointer-events': 'none',
+      }));
+    }
+  }
 }
 
 function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
@@ -254,6 +289,55 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
     fill: 'transparent', cursor: 'ew-resize',
     'data-action': 'resize-task', 'data-tid': t.id, 'data-edge': 'right'
   }));
+
+  barPos[t.id] = { x: barX, y: barY, w: barW, h: barH, midY: barY + barH / 2 };
+}
+
+function renderDependencyArrows(svg) {
+  const defs = svgEl('defs', {});
+  const marker = svgEl('marker', {
+    id: 'dep-arrow', markerWidth: '8', markerHeight: '8',
+    refX: '6', refY: '3', orient: 'auto', markerUnits: 'userSpaceOnUse',
+  });
+  marker.appendChild(svgEl('polygon', { points: '0,0 6,3 0,6', fill: '#94a3b8' }));
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  const pairs = [];
+  for (const g of state.groups) {
+    for (const t of g.tasks)
+      for (const depId of (t.depends_on || []))
+        pairs.push({ fromId: depId, toId: t.id });
+    for (const depId of (g.depends_on || []))
+      pairs.push({ fromId: depId, toId: g.id });
+  }
+
+  for (const { fromId, toId } of pairs) {
+    const from = barPos[fromId];
+    const to   = barPos[toId];
+    if (!from || !to) continue;
+
+    const x2 = to.x, y2 = to.midY;
+    let d;
+    if (to.x < from.x + from.w) {
+      // Overlap: drop from predecessor's bottom at a point left of the dependent,
+      // then go right to its left edge (└──→ shape)
+      const dropX = Math.max(from.x, to.x - 10);
+      d = `M ${dropX} ${from.y + from.h} L ${dropX} ${y2} L ${x2} ${y2}`;
+    } else {
+      const x1 = from.x + from.w, y1 = from.midY;
+      if (Math.abs(y1 - y2) < 2) {
+        d = `M ${x1} ${y1} L ${x2} ${y2}`;
+      } else {
+        const midX = x1 + Math.max((x2 - x1) / 2, 16);
+        d = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+      }
+    }
+    svg.appendChild(svgEl('path', {
+      d, stroke: '#94a3b8', 'stroke-width': '1.5', fill: 'none',
+      'marker-end': 'url(#dep-arrow)', 'pointer-events': 'none',
+    }));
+  }
 }
 
 function hexToRgba(hex, alpha) {
@@ -304,6 +388,17 @@ svgEl_root.addEventListener('pointerdown', (e) => {
     };
     svgEl_root.setPointerCapture(e.pointerId);
     e.preventDefault();
+  } else if (el.dataset.action === 'reorder-group') {
+    dragState = {
+      type: 'reorder-group',
+      gid: el.dataset.gid,
+      startY: e.clientY,
+      origIndex: state.groups.findIndex(g => g.id === el.dataset.gid),
+      currentIndex: state.groups.findIndex(g => g.id === el.dataset.gid),
+      hasMoved: false,
+    };
+    svgEl_root.setPointerCapture(e.pointerId);
+    e.preventDefault();
   } else if (el.dataset.action === 'resize-task') {
     const task = findTask(el.dataset.tid);
     if (!task) return;
@@ -331,6 +426,39 @@ svgEl_root.addEventListener('pointerdown', (e) => {
 
 svgEl_root.addEventListener('pointermove', (e) => {
   if (!dragState) return;
+
+  if (dragState.type === 'reorder-group') {
+    const dy = e.clientY - dragState.startY;
+    if (Math.abs(dy) > 4) dragState.hasMoved = true;
+    if (!dragState.hasMoved) return;
+
+    const svgRect = svgEl_root.getBoundingClientRect();
+    const svgY = e.clientY - svgRect.top;
+
+    let targetSlot = groupYPos.length;
+    for (let i = 0; i < groupYPos.length; i++) {
+      if (svgY < groupYPos[i].y + groupYPos[i].h / 2) { targetSlot = i; break; }
+    }
+    dragState.currentIndex = targetSlot;
+
+    const last = groupYPos[groupYPos.length - 1];
+    const indicatorY = targetSlot < groupYPos.length
+      ? groupYPos[targetSlot].y
+      : last.y + last.h;
+
+    if (!reorderIndicator) {
+      reorderIndicator = svgEl('line', {
+        x1: 0, y1: indicatorY, x2: svgEl_root.getAttribute('width'), y2: indicatorY,
+        stroke: '#2563eb', 'stroke-width': 2, 'pointer-events': 'none',
+      });
+      svgEl_root.appendChild(reorderIndicator);
+    } else {
+      reorderIndicator.setAttribute('y1', indicatorY);
+      reorderIndicator.setAttribute('y2', indicatorY);
+    }
+    return;
+  }
+
   const dx = e.clientX - dragState.startX;
   if (Math.abs(dx) > 5) dragState.hasMoved = true;
   if (!dragState.hasMoved) return;
@@ -356,7 +484,22 @@ svgEl_root.addEventListener('pointerup', async (e) => {
   if (!dragState) return;
   const ds = dragState;
   dragState = null;
+
+  if (reorderIndicator) { reorderIndicator.remove(); reorderIndicator = null; }
+
   if (!ds.hasMoved) return;  // pure click — let click handler fire
+
+  if (ds.type === 'reorder-group') {
+    const ids = state.groups.map(g => g.id);
+    ids.splice(ds.origIndex, 1);
+    const insertAt = ds.currentIndex > ds.origIndex ? ds.currentIndex - 1 : ds.currentIndex;
+    ids.splice(insertAt, 0, ds.gid);
+    try {
+      await api('POST', '/groups/reorder', { ids });
+      await loadRoadmap();
+    } catch (err) { showToast(err.message); render(); }
+    return;
+  }
 
   const dx = e.clientX - ds.startX;
   const task = findTask(ds.tid);
@@ -378,7 +521,7 @@ svgEl_root.addEventListener('pointerup', async (e) => {
   }
 
   try {
-    await api('PUT', `/tasks/${ds.tid}`, { name: task.name, start: newStart, end: newEnd, assignee: task.assignee || null });
+    await api('PUT', `/tasks/${ds.tid}`, { name: task.name, start: newStart, end: newEnd, assignee: task.assignee || null, depends_on: task.depends_on || [] });
     await loadRoadmap();
   } catch (err) {
     showToast(err.message);
@@ -396,7 +539,7 @@ svgEl_root.addEventListener('click', async (e) => {
   try {
     if (action === 'toggle-group') {
       const g = state.groups.find(g => g.id === gid);
-      await api('PUT', `/groups/${gid}`, { name: g.name, color: g.color, collapsed: !g.collapsed });
+      await api('PUT', `/groups/${gid}`, { name: g.name, color: g.color, collapsed: !g.collapsed, depends_on: g.depends_on || [] });
       await loadRoadmap();
     } else if (action === 'edit-group') {
       openEditGroupModal(gid);
@@ -437,6 +580,12 @@ function openModal(title, fields, onSave, onDelete = null) {
     if (f.type === 'textarea') {
       div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
         <textarea id="field-${f.name}" name="${f.name}" placeholder="${f.placeholder || ''}" rows="8"></textarea>`;
+    } else if (f.type === 'select') {
+      const opts = (f.options || [])
+        .map(o => `<option value="${o.value}"${o.value === (f.value ?? '') ? ' selected' : ''}>${o.label}</option>`)
+        .join('');
+      div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
+        <select id="field-${f.name}" name="${f.name}">${opts}</select>`;
     } else {
       div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
         <input id="field-${f.name}" name="${f.name}" type="${f.type || 'text'}"
@@ -501,11 +650,19 @@ function openAddGroupModal() {
 
 function openEditGroupModal(gid) {
   const g = state.groups.find(g => g.id === gid);
+  const groupOptions = [{ value: '', label: '(none)' }];
+  for (const other of state.groups)
+    if (other.id !== gid) groupOptions.push({ value: other.id, label: other.name });
+  const currentDep = (g.depends_on?.length > 0) ? g.depends_on[0] : '';
   openModal('Edit Group', [
     { name: 'name', label: 'Group name', value: g.name },
     { name: 'color', label: 'Color', type: 'color', value: g.color },
+    { name: 'depends_on', label: 'Depends on', type: 'select', value: currentDep, options: groupOptions },
   ], async (data) => {
-    await api('PUT', `/groups/${gid}`, { name: data.name, color: data.color, collapsed: g.collapsed });
+    await api('PUT', `/groups/${gid}`, {
+      name: data.name, color: data.color, collapsed: g.collapsed,
+      depends_on: data.depends_on ? [data.depends_on] : [],
+    });
   }, async () => {
     if (confirm('Delete this group and all its tasks?')) {
       await api('DELETE', `/groups/${gid}`);
@@ -533,13 +690,22 @@ function openEditTaskModal(tid) {
     const t = g.tasks.find(t => t.id === tid);
     if (t) { task = t; break; }
   }
+  const taskOptions = [{ value: '', label: '(none)' }];
+  for (const g of state.groups)
+    for (const t of g.tasks)
+      if (t.id !== tid) taskOptions.push({ value: t.id, label: `${g.name} / ${t.name}` });
+  const currentDep = (task.depends_on?.length > 0) ? task.depends_on[0] : '';
   openModal('Edit Task', [
     { name: 'name', label: 'Task name', value: task.name },
     { name: 'start', label: 'Start date', type: 'date', value: task.start },
     { name: 'end', label: 'End date', type: 'date', value: task.end },
     { name: 'assignee', label: 'Assignee', value: task.assignee || '', required: false },
+    { name: 'depends_on', label: 'Depends on', type: 'select', value: currentDep, options: taskOptions },
   ], async (data) => {
-    await api('PUT', `/tasks/${tid}`, { name: data.name, start: data.start, end: data.end, assignee: data.assignee || null });
+    await api('PUT', `/tasks/${tid}`, {
+      name: data.name, start: data.start, end: data.end, assignee: data.assignee || null,
+      depends_on: data.depends_on ? [data.depends_on] : [],
+    });
   }, async () => {
     await api('DELETE', `/tasks/${tid}`);
   });

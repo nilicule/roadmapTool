@@ -28,9 +28,9 @@
 
 ### Data
 - [ ] Multiple roadmap files (file picker / switcher)
-- [ ] Import from clipboard or URL
+- [x] Import from clipboard or URL
 - [ ] Task progress percentage (partially filled bar)
-- [ ] Task assignees / owners
+- [x] Task assignees / owners
 
 ### Bugs
 - [x] Color picker in Add/Edit Group modal shows no preview of the selected color (input renders as blank/grey bar; color is picked but not visually reflected in the field)
@@ -39,4 +39,4 @@
 ### UX
 - [ ] Keyboard shortcuts (n = new task, e = edit selected, del = delete)
 - [ ] Search / filter tasks by name
-- [ ] Print / export to PNG or PDF
+- [x] Export to PNG

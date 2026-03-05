@@ -11,6 +11,7 @@ class Task(BaseModel):
     start: date
     end: date
     assignee: str | None = None
+    depends_on: list[str] = []
 
     @model_validator(mode='after')
     def check_dates(self):
@@ -32,6 +33,7 @@ class Group(BaseModel):
     color: str
     collapsed: bool = False
     tasks: list[Task] = []
+    depends_on: list[str] = []
 
     @field_validator('id')
     @classmethod

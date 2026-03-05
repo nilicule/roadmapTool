@@ -29,6 +29,16 @@ def test_group_id_must_be_slug():
         Group(id="has spaces", name="X", color="#FF0000", collapsed=False, tasks=[])
 
 
+def test_task_depends_on_defaults_to_empty():
+    t = Task(id="t1", name="A", start=date(2025, 1, 1), end=date(2025, 2, 1))
+    assert t.depends_on == []
+
+
+def test_group_depends_on_defaults_to_empty():
+    g = Group(id="g1", name="G1", color="#FF0000", collapsed=False, tasks=[])
+    assert g.depends_on == []
+
+
 def test_task_ids_unique_in_roadmap():
     with pytest.raises(ValidationError, match="duplicate task id"):
         Roadmap(

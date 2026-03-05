@@ -71,6 +71,41 @@ def test_reorder_groups(client):
     assert new_order == reversed_ids
 
 
+def test_update_task_depends_on(client):
+    roadmap = client.get("/api/roadmap").json()
+    task = roadmap["groups"][0]["tasks"][0]
+    tid = task["id"]
+    resp = client.put(f"/api/tasks/{tid}", json={
+        "name": task["name"], "start": task["start"], "end": task["end"],
+        "depends_on": ["x"]
+    })
+    assert resp.status_code == 200
+    assert resp.json()["depends_on"] == ["x"]
+
+
+def test_update_group_depends_on(client):
+    groups = client.get("/api/roadmap").json()["groups"]
+    gid1 = groups[0]["id"]
+    gid2 = groups[1]["id"]
+    resp = client.put(f"/api/groups/{gid1}", json={
+        "name": groups[0]["name"], "color": groups[0]["color"], "collapsed": False,
+        "depends_on": [gid2]
+    })
+    assert resp.status_code == 200
+    assert resp.json()["depends_on"] == [gid2]
+
+
+def test_update_task_depends_on_omitted_defaults_empty(client):
+    roadmap = client.get("/api/roadmap").json()
+    task = roadmap["groups"][0]["tasks"][0]
+    tid = task["id"]
+    resp = client.put(f"/api/tasks/{tid}", json={
+        "name": task["name"], "start": task["start"], "end": task["end"]
+    })
+    assert resp.status_code == 200
+    assert resp.json()["depends_on"] == []
+
+
 def test_validation_error_returns_422(client):
     resp = client.post("/api/groups", json={"name": "X", "color": "notahex"})
     assert resp.status_code == 422
