@@ -25,7 +25,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
 
-.chart-container { overflow-x: auto; padding: 0 20px 20px; }
+.chart-container { overflow-x: auto; padding: 0 20px 20px; position: relative; }
 #roadmap-svg { display: block; min-width: 100%; }
 
 /* Modal */
@@ -56,3 +56,44 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
 [data-action="reorder-group"] { cursor: grab; }
 [data-action="reorder-group"]:active { cursor: grabbing; }
+
+#task-popup {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 12px;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  font-size: 13px;
+  z-index: 50;
+  min-width: 100px;
+  max-width: 260px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+#task-popup.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+#task-popup-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+#task-popup-tags:empty { display: none; margin-bottom: 0; }
+.tag-pill {
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+}
+#task-popup-assignee {
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
