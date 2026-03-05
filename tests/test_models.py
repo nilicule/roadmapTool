@@ -50,3 +50,13 @@ def test_task_ids_unique_in_roadmap():
                 ])
             ]
         )
+
+
+def test_task_tags_default_empty():
+    t = Task(id="t1", name="A", start=date(2025, 1, 1), end=date(2025, 2, 1))
+    assert t.tags == []
+
+
+def test_task_tags_roundtrip():
+    t = Task(id="t1", name="A", start=date(2025, 1, 1), end=date(2025, 2, 1), tags=["security", "backend"])
+    assert t.tags == ["security", "backend"]

@@ -13,6 +13,7 @@ class Task(BaseModel):
     assignee: str | None = None
     depends_on: list[str] = []
     progress: int | None = None
+    tags: list[str] = []
 
     @field_validator('progress')
     @classmethod
