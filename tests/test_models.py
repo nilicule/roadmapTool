@@ -20,7 +20,7 @@ def test_roadmap_start_must_be_before_end():
 
 
 def test_task_end_must_not_be_before_start():
-    with pytest.raises(ValidationError, match="start must be before or equal to end"):
+    with pytest.raises(ValidationError, match="end must be on or after start"):
         Task(id="t1", name="Bad", start=date(2025, 3, 1), end=date(2025, 2, 1))
 
 

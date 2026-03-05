@@ -54,6 +54,12 @@ def export_roadmap():
     )
 
 
+@router.put("/roadmap/restore")
+def restore_roadmap(rm: Roadmap):
+    _save(rm)
+    return rm.model_dump(mode="json")
+
+
 @router.post("/roadmap/import")
 async def import_roadmap(request: Request):
     body = await request.body()
@@ -140,6 +146,7 @@ class TaskCreate(BaseModel):
     end: str
     assignee: str | None = None
     depends_on: list[str] = []
+    progress: int | None = None
 
 
 class TaskUpdate(BaseModel):
@@ -148,6 +155,7 @@ class TaskUpdate(BaseModel):
     end: str
     assignee: str | None = None
     depends_on: list[str] = []
+    progress: int | None = None
 
 
 @router.post("/groups/{gid}/tasks")
@@ -155,7 +163,7 @@ def add_task(gid: str, body: TaskCreate):
     rm = _load()
     for g in rm.groups:
         if g.id == gid:
-            task = Task(id=_slug(body.name), name=body.name, start=body.start, end=body.end, assignee=body.assignee, depends_on=body.depends_on)
+            task = Task(id=_slug(body.name), name=body.name, start=body.start, end=body.end, assignee=body.assignee, depends_on=body.depends_on, progress=body.progress)
             g.tasks.append(task)
             _save(rm)
             return task.model_dump(mode="json")
@@ -173,6 +181,7 @@ def update_task(tid: str, body: TaskUpdate):
                 t.end = date_type.fromisoformat(body.end)
                 t.assignee = body.assignee
                 t.depends_on = body.depends_on
+                t.progress = body.progress
                 _save(rm)
                 return t.model_dump(mode="json")
     raise HTTPException(status_code=404, detail=f"Task {tid!r} not found")

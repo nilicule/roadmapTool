@@ -12,11 +12,19 @@ class Task(BaseModel):
     end: date
     assignee: str | None = None
     depends_on: list[str] = []
+    progress: int | None = None
+
+    @field_validator('progress')
+    @classmethod
+    def check_progress(cls, v):
+        if v is not None and not (0 <= v <= 100):
+            raise ValueError('progress must be 0–100')
+        return v
 
     @model_validator(mode='after')
     def check_dates(self):
         if self.end < self.start:
-            raise ValueError("start must be before or equal to end")
+            raise ValueError("end must be on or after start")
         return self
 
     @field_validator('id')

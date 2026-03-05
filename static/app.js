@@ -18,6 +18,9 @@ const ZOOM_LEVELS = [
 // State
 // ============================================================
 let state = null;  // Roadmap object from API
+let undoStack = [];
+let redoStack = [];
+let _skipHistory = false;
 let zoomLevel = 0;    // index into ZOOM_LEVELS; 0 = Year (default)
 let dayW = 0;         // pixels per day (module-level, set in renderSVG)
 let timeStart = null; // Date object (module-level, set in renderSVG)
@@ -36,6 +39,10 @@ function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
 // API
 // ============================================================
 async function api(method, path, body, contentType = 'application/json') {
+  if (method !== 'GET' && state && !_skipHistory) {
+    undoStack.push(JSON.parse(JSON.stringify(state)));
+    redoStack.length = 0;
+  }
   const res = await fetch('/api' + path, {
     method,
     headers: body ? {'Content-Type': contentType} : {},
@@ -48,9 +55,19 @@ async function api(method, path, body, contentType = 'application/json') {
   return res.json();
 }
 
+function scrollToToday() {
+  const tod = today();
+  if (!timeStart || !dayW) return;
+  const tx = LABEL_W + daysDiff(timeStart, tod) * dayW;
+  const container = document.querySelector('.chart-container');
+  container.scrollLeft = tx - container.clientWidth / 2;
+}
+
+let _firstLoad = true;
 async function loadRoadmap() {
   state = await api('GET', '/roadmap');
   render();
+  if (_firstLoad) { _firstLoad = false; scrollToToday(); }
 }
 
 // ============================================================
@@ -68,6 +85,7 @@ function svgEl(tag, attrs = {}, text = null) {
 // ============================================================
 function render() {
   if (!state) return;
+  document.getElementById('roadmap-title').textContent = state.title;
   renderLegend();
   renderSVG();
 }
@@ -229,6 +247,14 @@ function renderGroup(svg, g, y, containerW) {
     const gBarH = 8;
     const gBarY = y + (GROUP_H - gBarH) / 2;
     barPos[g.id] = { x: gBarX, y: gBarY, w: gBarW, h: gBarH, midY: gBarY + gBarH / 2 };
+    const tasksWithProgress = g.tasks.filter(t => t.progress != null);
+    if (tasksWithProgress.length > 0) {
+      const avg = Math.round(tasksWithProgress.reduce((s, t) => s + t.progress, 0) / tasksWithProgress.length);
+      svg.appendChild(svgEl('text', {
+        x: LABEL_W - 60, y: y + GROUP_H / 2 + 5,
+        fill: '#6b7280', 'font-size': 11, 'text-anchor': 'middle', 'pointer-events': 'none'
+      }, `${avg}%`));
+    }
     if (g.collapsed) {
       svg.appendChild(svgEl('rect', {
         x: gBarX, y: gBarY, width: gBarW, height: gBarH,
@@ -248,6 +274,21 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
     fill: '#374151', 'font-size': 12
   }, truncate(t.name, 28)));
 
+  const isMilestone = t.start === t.end;
+
+  if (isMilestone) {
+    const cx = LABEL_W + daysDiff(timeStart, parseDate(t.start)) * dayW;
+    const cy = y + TASK_H / 2;
+    const R = 9;
+    svg.appendChild(svgEl('polygon', {
+      points: `${cx},${cy-R} ${cx+R},${cy} ${cx},${cy+R} ${cx-R},${cy}`,
+      fill: g.color, opacity: 0.9, cursor: 'pointer',
+      'data-action': 'edit-task', 'data-tid': t.id, 'data-milestone': '1'
+    }));
+    barPos[t.id] = { x: cx, y: cy - R, w: 0, h: R * 2, midY: cy };
+    return;
+  }
+
   // Bar
   const barX = LABEL_W + daysDiff(timeStart, parseDate(t.start)) * dayW;
   const barW = Math.max(daysDiff(parseDate(t.start), parseDate(t.end)) * dayW, 4);
@@ -259,6 +300,15 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
     rx: 4, fill: g.color, opacity: 0.85, cursor: 'pointer',
     'data-action': 'edit-task', 'data-tid': t.id
   }));
+
+  // Progress overlay
+  if (t.progress != null && t.progress < 100) {
+    const unfilledW = barW * (1 - t.progress / 100);
+    svg.appendChild(svgEl('rect', {
+      x: barX + barW - unfilledW, y: barY, width: unfilledW, height: barH,
+      rx: 0, fill: '#fff', opacity: 0.4, 'pointer-events': 'none'
+    }));
+  }
 
   // Bar label
   if (barW > 30) {
@@ -293,6 +343,13 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
   barPos[t.id] = { x: barX, y: barY, w: barW, h: barH, midY: barY + barH / 2 };
 }
 
+function findGroupForTask(tid) {
+  for (const g of state.groups)
+    for (const t of g.tasks)
+      if (t.id === tid) return g;
+  return null;
+}
+
 function renderDependencyArrows(svg) {
   const defs = svgEl('defs', {});
   const marker = svgEl('marker', {
@@ -313,8 +370,8 @@ function renderDependencyArrows(svg) {
   }
 
   for (const { fromId, toId } of pairs) {
-    const from = barPos[fromId];
-    const to   = barPos[toId];
+    const from = barPos[fromId] ?? barPos[findGroupForTask(fromId)?.id];
+    const to   = barPos[toId]   ?? barPos[findGroupForTask(toId)?.id];
     if (!from || !to) continue;
 
     const x2 = to.x, y2 = to.midY;
@@ -350,6 +407,29 @@ function hexToRgba(hex, alpha) {
 function truncate(s, n) { return s.length <= n ? s : s.slice(0, n - 1) + '…'; }
 
 // ============================================================
+// Undo / Redo
+// ============================================================
+async function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(JSON.parse(JSON.stringify(state)));
+  const snapshot = undoStack.pop();
+  _skipHistory = true;
+  try { await api('PUT', '/roadmap/restore', snapshot); await loadRoadmap(); }
+  catch (err) { showToast(err.message); }
+  finally { _skipHistory = false; }
+}
+
+async function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(JSON.parse(JSON.stringify(state)));
+  const snapshot = redoStack.pop();
+  _skipHistory = true;
+  try { await api('PUT', '/roadmap/restore', snapshot); await loadRoadmap(); }
+  catch (err) { showToast(err.message); }
+  finally { _skipHistory = false; }
+}
+
+// ============================================================
 // Drag state
 // ============================================================
 let dragState = null;
@@ -373,7 +453,7 @@ const svgEl_root = document.getElementById('roadmap-svg');
 
 svgEl_root.addEventListener('pointerdown', (e) => {
   const el = e.target;
-  if (el.dataset.action === 'edit-task') {
+  if (el.dataset.action === 'edit-task' && !el.dataset.milestone) {
     const task = findTask(el.dataset.tid);
     if (!task) return;
     dragState = {
@@ -521,7 +601,7 @@ svgEl_root.addEventListener('pointerup', async (e) => {
   }
 
   try {
-    await api('PUT', `/tasks/${ds.tid}`, { name: task.name, start: newStart, end: newEnd, assignee: task.assignee || null, depends_on: task.depends_on || [] });
+    await api('PUT', `/tasks/${ds.tid}`, { name: task.name, start: newStart, end: newEnd, assignee: task.assignee || null, depends_on: task.depends_on || [], progress: task.progress ?? null });
     await loadRoadmap();
   } catch (err) {
     showToast(err.message);
@@ -630,7 +710,9 @@ function closeModal() {
 
 document.getElementById('modal-cancel').addEventListener('click', closeModal);
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Escape') { closeModal(); return; }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); }
 });
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
@@ -679,8 +761,9 @@ function openAddTaskModal(gid) {
     { name: 'start', label: 'Start date', type: 'date', value: state.start },
     { name: 'end', label: 'End date', type: 'date', value: state.start },
     { name: 'assignee', label: 'Assignee', placeholder: 'e.g. Alice', required: false },
+    { name: 'progress', label: 'Progress (%)', type: 'number', value: '', required: false, placeholder: '0–100' },
   ], async (data) => {
-    await api('POST', `/groups/${gid}/tasks`, { name: data.name, start: data.start, end: data.end, assignee: data.assignee || null });
+    await api('POST', `/groups/${gid}/tasks`, { name: data.name, start: data.start, end: data.end, assignee: data.assignee || null, progress: data.progress !== '' ? parseInt(data.progress) : null });
   });
 }
 
@@ -701,10 +784,12 @@ function openEditTaskModal(tid) {
     { name: 'end', label: 'End date', type: 'date', value: task.end },
     { name: 'assignee', label: 'Assignee', value: task.assignee || '', required: false },
     { name: 'depends_on', label: 'Depends on', type: 'select', value: currentDep, options: taskOptions },
+    { name: 'progress', label: 'Progress (%)', type: 'number', value: task.progress ?? '', required: false, placeholder: '0–100' },
   ], async (data) => {
     await api('PUT', `/tasks/${tid}`, {
       name: data.name, start: data.start, end: data.end, assignee: data.assignee || null,
       depends_on: data.depends_on ? [data.depends_on] : [],
+      progress: data.progress !== '' ? parseInt(data.progress) : null,
     });
   }, async () => {
     await api('DELETE', `/tasks/${tid}`);
@@ -724,6 +809,10 @@ function applyZoom(delta) {
 }
 document.getElementById('btn-zoom-in').addEventListener('click', () => applyZoom(+1));
 document.getElementById('btn-zoom-out').addEventListener('click', () => applyZoom(-1));
+
+document.getElementById('btn-today').addEventListener('click', scrollToToday);
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-redo').addEventListener('click', redo);
 
 document.getElementById('btn-add-group').addEventListener('click', openAddGroupModal);
 
@@ -779,4 +868,20 @@ document.getElementById('btn-export').addEventListener('click', async () => {
 // ============================================================
 // Bootstrap
 // ============================================================
-loadRoadmap();
+async function bootstrap() {
+  const params = new URLSearchParams(window.location.search);
+  const remoteUrl = params.get('url');
+  if (remoteUrl) {
+    try {
+      const res = await fetch(remoteUrl);
+      if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+      const text = await res.text();
+      await api('POST', '/roadmap/import', text, 'text/plain');
+      history.replaceState(null, '', window.location.pathname);
+    } catch (err) {
+      showToast(`Failed to load from URL: ${err.message}`);
+    }
+  }
+  await loadRoadmap();
+}
+bootstrap();
