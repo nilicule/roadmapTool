@@ -286,11 +286,20 @@ function renderGroup(svg, g, y, containerW) {
 
   // "+ task" button
   svg.appendChild(svgEl('text', {
-    x: LABEL_W - 14, y: y + GROUP_H / 2 + 5,
+    x: LABEL_W - 28, y: y + GROUP_H / 2 + 5,
     fill: '#9ca3af', 'font-size': 14, cursor: 'pointer',
     'text-anchor': 'middle',
     'data-action': 'add-task', 'data-gid': g.id
   }, '+'));
+
+  // "◇ milestone" button
+  svg.appendChild(svgEl('text', {
+    x: LABEL_W - 14, y: y + GROUP_H / 2 + 5,
+    'text-anchor': 'middle', fill: g.color, 'font-size': 14,
+    cursor: 'pointer', 'font-weight': 'bold',
+    'data-action': 'add-milestone', 'data-gid': g.id,
+    title: 'Add milestone'
+  }, '◇'));
 
   // Summary bar (collapsed) + barPos for dependency arrows
   if (g.tasks.length > 0) {
@@ -342,6 +351,11 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
       }));
     }
     barPos[t.id] = { x: cx, y: cy - R, w: 0, h: R * 2, midY: cy };
+    svg.appendChild(svgEl('text', {
+      x: cx + R + 6, y: cy + 4,
+      fill: '#374151', 'font-size': 12, 'font-weight': '500',
+      'pointer-events': 'none'
+    }, truncate(t.name, 28)));
     return;
   }
 
@@ -472,6 +486,10 @@ function renderDependencyArrows(svg) {
     const stroke = isViolation ? '#f59e0b' : '#94a3b8';
     const markerId = isViolation ? 'dep-arrow-warn' : 'dep-arrow';
 
+    // Tasks are "touching" when the gap between end and start is 0 or 1 day
+    const isAdjacent = fromTask && toTask &&
+      daysDiff(parseDate(fromTask.end), parseDate(toTask.start)) <= 1;
+
     const x2 = to.x, y2 = to.midY;
     let d;
     if (to.x < from.x + from.w) {
@@ -481,9 +499,15 @@ function renderDependencyArrows(svg) {
       const x1 = from.x + from.w, y1 = from.midY;
       if (Math.abs(y1 - y2) < 2) {
         d = `M ${x1} ${y1} L ${x2} ${y2}`;
-      } else {
-        const midX = x1 + Math.max((x2 - x1) / 2, 16);
+      } else if (!isAdjacent && x2 - x1 >= 32) {
+        // Enough horizontal room and not touching — standard S-curve
+        const midX = x1 + (x2 - x1) / 2;
         d = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+      } else {
+        // Adjacent or nearly adjacent — hook left at the bottom so the final
+        // segment always approaches the target bar rightward (correct arrowhead)
+        const hookX = x1 - 12;
+        d = `M ${x1} ${from.y + from.h} L ${hookX} ${from.y + from.h} L ${hookX} ${y2} L ${x2} ${y2}`;
       }
     }
     svg.appendChild(svgEl('path', {
@@ -801,6 +825,8 @@ svgEl_root.addEventListener('click', async (e) => {
       openEditGroupModal(gid);
     } else if (action === 'add-task') {
       openAddTaskModal(gid);
+    } else if (action === 'add-milestone') {
+      openAddMilestoneModal(gid);
     } else if (action === 'edit-task' || action === 'resize-task') {
       openEditTaskModal(tid);
     }
@@ -1106,12 +1132,52 @@ function openAddTaskModal(gid) {
   });
 }
 
+function openAddMilestoneModal(gid) {
+  openModal('Add Milestone', [
+    { name: 'name', label: 'Milestone name', placeholder: 'e.g. v1.0 Release' },
+    { name: 'date', label: 'Date', type: 'date', value: state.start },
+    { name: 'assignee', label: 'Assignee', placeholder: 'e.g. Alice', required: false },
+    { name: 'tags', label: 'Tags', placeholder: 'launch, external, ...', required: false, value: '' },
+  ], async (data) => {
+    const d = normalizeDate(data.date);
+    await api('POST', `/groups/${gid}/tasks`, {
+      name: data.name, start: d, end: d,
+      assignee: data.assignee || null,
+      progress: null,
+      tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
+    });
+  });
+}
+
 function openEditTaskModal(tid) {
   let task;
   for (const g of state.groups) {
     const t = g.tasks.find(t => t.id === tid);
     if (t) { task = t; break; }
   }
+
+  // Milestone: simplified modal (single date, no progress)
+  if (task.start === task.end) {
+    openModal('Edit Milestone', [
+      { name: 'name', label: 'Milestone name', value: task.name },
+      { name: 'date', label: 'Date', type: 'date', value: task.start },
+      { name: 'assignee', label: 'Assignee', value: task.assignee || '', required: false },
+      { name: 'tags', label: 'Tags', value: (task.tags || []).join(', '), required: false, placeholder: 'launch, external, ...' },
+    ], async (data) => {
+      const d = normalizeDate(data.date);
+      await api('PUT', `/tasks/${tid}`, {
+        name: data.name, start: d, end: d,
+        assignee: data.assignee || null,
+        depends_on: task.depends_on || [],
+        progress: null,
+        tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
+      });
+    }, async () => {
+      await api('DELETE', `/tasks/${tid}`);
+    });
+    return;
+  }
+
   const taskOptions = [{ value: '', label: '(none)' }];
   for (const g of state.groups)
     for (const t of g.tasks)

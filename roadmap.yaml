@@ -105,8 +105,17 @@ groups:
     tags: []
   - id: implement_ticketing_strategy_391709
     name: Implement ticketing strategy
-    start: '2026-04-01'
-    end: '2026-04-30'
+    start: '2026-03-31'
+    end: '2026-04-29'
+    assignee:
+    depends_on:
+    - define_ticketing_strategy_d02604
+    progress:
+    tags: []
+  - id: release_bd182f
+    name: Release
+    start: '2026-05-01'
+    end: '2026-05-01'
     assignee:
     depends_on: []
     progress:
