@@ -10,7 +10,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 .toolbar__title { font-size: 20px; font-weight: 600; }
 .toolbar__actions { display: flex; gap: 8px; align-items: center; }
 .zoom-controls { display: flex; align-items: center; gap: 4px; }
-#zoom-label { font-size: 13px; min-width: 28px; text-align: center; }
+#zoom-label { font-size: 13px; min-width: 52px; text-align: center; }
 
 .btn { padding: 7px 16px; border: 1px solid #ccc; border-radius: 6px;
        background: #fff; cursor: pointer; font-size: 14px; }

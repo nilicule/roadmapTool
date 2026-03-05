@@ -9,12 +9,12 @@ groups:
   tasks:
   - id: task1
     name: Basic setup
-    start: '2025-01-01'
-    end: '2025-02-15'
+    start: '2025-01-14'
+    end: '2025-02-28'
   - id: task2
     name: ISMS documentation
-    start: '2025-01-15'
-    end: '2025-03-01'
+    start: '2025-02-11'
+    end: '2025-03-25'
 - id: phase2
   name: Advanced Modules
   color: '#2196F3'
@@ -22,5 +22,5 @@ groups:
   tasks:
   - id: task3
     name: Online assessments
-    start: '2025-04-01'
-    end: '2025-04-30'
+    start: '2025-04-02'
+    end: '2025-06-21'

@@ -7,12 +7,18 @@ const GROUP_H = 34;
 const TASK_H = 30;
 const BAR_MARGIN = 5;
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const ZOOM_LEVELS = [
+  { label: 'Year',    days: null },
+  { label: 'Quarter', days: 91  },
+  { label: 'Month',   days: 30  },
+  { label: 'Week',    days: 7   },
+];
 
 // ============================================================
 // State
 // ============================================================
 let state = null;  // Roadmap object from API
-let zoomFactor = 1;   // multiplier applied to dayW
+let zoomLevel = 0;    // index into ZOOM_LEVELS; 0 = Year (default)
 let dayW = 0;         // pixels per day (module-level, set in renderSVG)
 let timeStart = null; // Date object (module-level, set in renderSVG)
 
@@ -82,8 +88,8 @@ function renderSVG() {
   timeStart = parseDate(state.start);
   const timeEnd   = parseDate(state.end);
   const totalDays = daysDiff(timeStart, timeEnd);
-  const baseDayW = (containerW - LABEL_W) / totalDays;
-  dayW = baseDayW * zoomFactor;
+  const targetDays = ZOOM_LEVELS[zoomLevel].days ?? totalDays;
+  dayW = (containerW - LABEL_W) / targetDays;
   const svgW = LABEL_W + totalDays * dayW;
 
   // Compute total height
@@ -180,17 +186,18 @@ function renderGroup(svg, g, y, containerW) {
     'data-action': 'toggle-group', 'data-gid': g.id
   }, `${arrow} ${g.name}`));
 
-  // Edit button
+  // Edit button — \uFE0E forces text (not emoji) rendering of ✎
   svg.appendChild(svgEl('text', {
-    x: LABEL_W - 24, y: y + GROUP_H / 2 + 5,
+    x: LABEL_W - 38, y: y + GROUP_H / 2 + 5,
     fill: '#6b7280', 'font-size': 13, cursor: 'pointer',
+    'text-anchor': 'middle',
     'data-action': 'edit-group', 'data-gid': g.id
-  }, '✎'));
+  }, '\u270E\uFE0E'));
 
   // "+ task" button
   svg.appendChild(svgEl('text', {
     x: LABEL_W - 14, y: y + GROUP_H / 2 + 5,
-    fill: '#9ca3af', 'font-size': 12, cursor: 'pointer',
+    fill: '#9ca3af', 'font-size': 14, cursor: 'pointer',
     'text-anchor': 'middle',
     'data-action': 'add-task', 'data-gid': g.id
   }, '+'));
@@ -459,6 +466,9 @@ function closeModal() {
 }
 
 document.getElementById('modal-cancel').addEventListener('click', closeModal);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 });
@@ -525,12 +535,9 @@ function openEditTaskModal(tid) {
 // ============================================================
 // Zoom controls
 // ============================================================
-const ZOOM_STEPS = [0.5, 1, 2, 4, 8];
 function applyZoom(delta) {
-  const idx = ZOOM_STEPS.indexOf(zoomFactor);
-  const next = Math.max(0, Math.min(ZOOM_STEPS.length - 1, idx + delta));
-  zoomFactor = ZOOM_STEPS[next];
-  document.getElementById('zoom-label').textContent = `${zoomFactor}×`;
+  zoomLevel = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, zoomLevel + delta));
+  document.getElementById('zoom-label').textContent = ZOOM_LEVELS[zoomLevel].label;
   render();
 }
 document.getElementById('btn-zoom-in').addEventListener('click', () => applyZoom(+1));

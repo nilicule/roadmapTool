@@ -15,13 +15,13 @@
 ## Post-MVP
 
 ### Interactions
-- [ ] Drag task bars to move dates
-- [ ] Drag bar edges to resize (change start/end)
+- [x] Drag task bars to move dates
+- [x] Drag bar edges to resize (change start/end)
 - [ ] Drag groups to reorder (replace reorder API with drag-and-drop)
 - [ ] Undo / redo
 
 ### View
-- [ ] Zoom levels (week / month / quarter / year)
+- [x] Zoom levels (week / month / quarter / year)
 - [ ] Scroll to today on load
 - [ ] Task dependency arrows between bars
 - [ ] Milestone markers (diamond shape, zero-duration tasks)
@@ -33,8 +33,8 @@
 - [ ] Task assignees / owners
 
 ### Bugs
-- [ ] Color picker in Add/Edit Group modal shows no preview of the selected color (input renders as blank/grey bar; color is picked but not visually reflected in the field)
-- [ ] "+" add task button sits on the bottom border of the group header row, overlapping with the first task row below it — needs to be vertically centered within the group header
+- [x] Color picker in Add/Edit Group modal shows no preview of the selected color (input renders as blank/grey bar; color is picked but not visually reflected in the field)
+- [x] "+" add task button sits on the bottom border of the group header row, overlapping with the first task row below it — needs to be vertically centered within the group header
 
 ### UX
 - [ ] Keyboard shortcuts (n = new task, e = edit selected, del = delete)
