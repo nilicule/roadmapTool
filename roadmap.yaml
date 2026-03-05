@@ -22,7 +22,15 @@ groups:
     assignee:
     depends_on:
     - task1
-    progress: 60
+    progress: 100
+    tags: []
+  - id: subtask_fe5d54
+    name: Subtask
+    start: '2026-09-01'
+    end: '2026-10-01'
+    assignee:
+    depends_on: []
+    progress:
     tags: []
   depends_on: []
 - id: phase2
