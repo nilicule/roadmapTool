@@ -10,7 +10,15 @@ groups:
   - id: hr_fa68bc
     name: HR
     start: '2026-03-09'
-    end: '2026-03-13'
+    end: '2026-03-31'
+    assignee:
+    depends_on: []
+    progress:
+    tags: []
+  - id: technology_f8666e
+    name: Technology
+    start: '2026-04-01'
+    end: '2026-04-30'
     assignee:
     depends_on: []
     progress:
