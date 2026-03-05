@@ -718,7 +718,7 @@ svgEl_root.addEventListener('pointerup', async (e) => {
   }
 
   try {
-    await api('PUT', `/tasks/${ds.tid}`, { name: task.name, start: newStart, end: newEnd, assignee: task.assignee || null, depends_on: task.depends_on || [], progress: task.progress ?? null });
+    await api('PUT', `/tasks/${ds.tid}`, { name: task.name, start: newStart, end: newEnd, assignee: task.assignee || null, depends_on: task.depends_on || [], progress: task.progress ?? null, tags: task.tags || [] });
     await loadRoadmap();
   } catch (err) {
     showToast(err.message);
@@ -979,8 +979,14 @@ function openAddTaskModal(gid) {
     { name: 'end', label: 'End date', type: 'date', value: state.start },
     { name: 'assignee', label: 'Assignee', placeholder: 'e.g. Alice', required: false },
     { name: 'progress', label: 'Progress (%)', type: 'number', value: '', required: false, placeholder: '0–100' },
+    { name: 'tags', label: 'Tags', placeholder: 'security, backend, ...', required: false, value: '' },
   ], async (data) => {
-    await api('POST', `/groups/${gid}/tasks`, { name: data.name, start: data.start, end: data.end, assignee: data.assignee || null, progress: data.progress !== '' ? parseInt(data.progress) : null });
+    await api('POST', `/groups/${gid}/tasks`, {
+      name: data.name, start: data.start, end: data.end,
+      assignee: data.assignee || null,
+      progress: data.progress !== '' ? parseInt(data.progress) : null,
+      tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
+    });
   });
 }
 
@@ -1003,6 +1009,7 @@ function openEditTaskModal(tid) {
     { name: 'assignee', label: 'Assignee', value: task.assignee || '', required: false },
     { name: 'depends_on', label: 'Depends on', type: 'select', value: currentDep, options: taskOptions },
     { name: 'progress', label: 'Progress (%)', type: 'number', value: task.progress ?? '', required: false, placeholder: '0–100' },
+    { name: 'tags', label: 'Tags', value: (task.tags || []).join(', '), required: false, placeholder: 'security, backend, ...' },
   ], async (data) => {
     if (data.depends_on && wouldCreateCycle(data.depends_on, tid))
       throw new Error('This dependency would create a cycle');
@@ -1010,6 +1017,7 @@ function openEditTaskModal(tid) {
       name: data.name, start: data.start, end: data.end, assignee: data.assignee || null,
       depends_on: data.depends_on ? [data.depends_on] : [],
       progress: data.progress !== '' ? parseInt(data.progress) : null,
+      tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
     });
   }, async () => {
     await api('DELETE', `/tasks/${tid}`);
