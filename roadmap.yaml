@@ -6,5 +6,37 @@ groups:
   name: Eramba
   color: '#4caf50'
   collapsed: false
+  tasks:
+  - id: hr_fa68bc
+    name: HR
+    start: '2026-03-09'
+    end: '2026-03-13'
+    assignee:
+    depends_on: []
+    progress:
+    tags: []
+  depends_on: []
+- id: engie_be_424b2a
+  name: Engie BE
+  color: '#00bcd4'
+  collapsed: false
+  tasks: []
+  depends_on: []
+- id: endpoint_security_7c2c04
+  name: EDR/XDR
+  color: '#e91e63'
+  collapsed: false
+  tasks: []
+  depends_on: []
+- id: security_privacy_f84a73
+  name: Security & Privacy
+  color: '#349d3b'
+  collapsed: true
+  tasks: []
+  depends_on: []
+- id: incident_handling_7237a5
+  name: Incident handling
+  color: '#9c27b0'
+  collapsed: false
   tasks: []
   depends_on: []

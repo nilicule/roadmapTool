@@ -810,6 +810,9 @@ function showTaskPopup(tid) {
   const popup = document.getElementById('task-popup');
   const container = document.querySelector('.chart-container');
 
+  // Name
+  document.getElementById('task-popup-name').textContent = task.name;
+
   // Tags
   const tagsEl = document.getElementById('task-popup-tags');
   tagsEl.innerHTML = '';
@@ -821,13 +824,13 @@ function showTaskPopup(tid) {
     tagsEl.appendChild(pill);
   }
 
-  // Assignee
-  document.getElementById('task-popup-assignee').textContent =
-    task.assignee ? `👤 ${task.assignee}` : '👤 —';
+  // Assignee (only shown when set)
+  const assigneeEl = document.getElementById('task-popup-assignee');
+  assigneeEl.textContent = task.assignee ? `👤 ${task.assignee}` : '';
 
-  // Position: below the bar, clamped to container width
+  // Position: flush below the bar, aligned to bar left edge
   const left = pos.x - container.scrollLeft;
-  const top = pos.y + pos.h + 6 - container.scrollTop;
+  const top = pos.y + pos.h + 2 - container.scrollTop;
   const maxLeft = container.clientWidth - 280;
   popup.style.left = `${Math.max(0, Math.min(left, maxLeft))}px`;
   popup.style.top = `${top}px`;

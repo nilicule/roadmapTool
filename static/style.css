@@ -77,6 +77,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   opacity: 1;
   transform: translateY(0);
 }
+#task-popup-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #111827;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 #task-popup-tags {
   display: flex;
   flex-wrap: wrap;
@@ -97,3 +106,4 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   align-items: center;
   gap: 5px;
 }
+#task-popup-assignee:empty { display: none; }
