@@ -36,6 +36,11 @@ let selectedTid = null;
 function parseDate(s) { return new Date(s + 'T00:00:00'); }
 function daysDiff(a, b) { return Math.round((b - a) / 86400000); }
 function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function tagColor(tag) {
+  let h = 0;
+  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) % 360;
+  return `hsl(${h}, 65%, 48%)`;
+}
 
 // ============================================================
 // API
@@ -360,6 +365,23 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
       x: barX + barW - 5, y: barY + barH / 2 + 4,
       fill: '#fff', 'font-size': 10, 'text-anchor': 'end', 'pointer-events': 'none', opacity: 0.85
     }, initials));
+  }
+
+  // Tag squares (left of assignee, right side of bar)
+  const tags = t.tags || [];
+  if (tags.length > 0 && barW > 20) {
+    const SQ = 10, GAP = 4;
+    const assigneeW = (t.assignee && barW > 50) ? 22 : 6;
+    const rightEdge = barX + barW - assigneeW;
+    tags.forEach((tag, i) => {
+      const sqX = rightEdge - (i + 1) * (SQ + GAP) + GAP;
+      if (sqX < barX + 4) return; // skip if no room
+      svg.appendChild(svgEl('rect', {
+        x: sqX, y: barY + (barH - SQ) / 2,
+        width: SQ, height: SQ, rx: 2,
+        fill: tagColor(tag), 'pointer-events': 'none'
+      }));
+    });
   }
 
   // Resize handles (transparent hit targets at left/right edges)
