@@ -10,6 +10,7 @@ class Task(BaseModel):
     name: str
     start: date
     end: date
+    assignee: str | None = None
 
     @model_validator(mode='after')
     def check_dates(self):

@@ -2,7 +2,7 @@ import re
 import uuid
 from datetime import date as date_type
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, field_validator
 import io
@@ -52,6 +52,19 @@ def export_roadmap():
         media_type="text/yaml",
         headers={"Content-Disposition": "attachment; filename=roadmap.yaml"}
     )
+
+
+@router.post("/roadmap/import")
+async def import_roadmap(request: Request):
+    body = await request.body()
+    text = body.decode("utf-8")
+    try:
+        raw = _yaml.load(text)
+        roadmap = Roadmap.model_validate(raw)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    _save(roadmap)
+    return roadmap.model_dump(mode="json")
 
 
 # --- Groups ---
@@ -123,12 +136,14 @@ class TaskCreate(BaseModel):
     name: str
     start: str
     end: str
+    assignee: str | None = None
 
 
 class TaskUpdate(BaseModel):
     name: str
     start: str
     end: str
+    assignee: str | None = None
 
 
 @router.post("/groups/{gid}/tasks")
@@ -136,7 +151,7 @@ def add_task(gid: str, body: TaskCreate):
     rm = _load()
     for g in rm.groups:
         if g.id == gid:
-            task = Task(id=_slug(body.name), name=body.name, start=body.start, end=body.end)
+            task = Task(id=_slug(body.name), name=body.name, start=body.start, end=body.end, assignee=body.assignee)
             g.tasks.append(task)
             _save(rm)
             return task.model_dump(mode="json")
@@ -152,6 +167,7 @@ def update_task(tid: str, body: TaskUpdate):
                 t.name = body.name
                 t.start = date_type.fromisoformat(body.start)
                 t.end = date_type.fromisoformat(body.end)
+                t.assignee = body.assignee
                 _save(rm)
                 return t.model_dump(mode="json")
     raise HTTPException(status_code=404, detail=f"Task {tid!r} not found")

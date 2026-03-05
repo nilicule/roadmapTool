@@ -32,11 +32,11 @@ function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
 // ============================================================
 // API
 // ============================================================
-async function api(method, path, body) {
+async function api(method, path, body, contentType = 'application/json') {
   const res = await fetch('/api' + path, {
     method,
-    headers: body ? {'Content-Type': 'application/json'} : {},
-    body: body ? JSON.stringify(body) : undefined,
+    headers: body ? {'Content-Type': contentType} : {},
+    body: body ? (contentType === 'application/json' ? JSON.stringify(body) : body) : undefined,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -233,6 +233,15 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
     }, truncate(t.name, Math.floor(barW / 7))));
   }
 
+  // Assignee initials
+  if (t.assignee && barW > 50) {
+    const initials = t.assignee.trim().split(/\s+/).map(w => w[0].toUpperCase()).slice(0, 2).join('');
+    svg.appendChild(svgEl('text', {
+      x: barX + barW - 5, y: barY + barH / 2 + 4,
+      fill: '#fff', 'font-size': 10, 'text-anchor': 'end', 'pointer-events': 'none', opacity: 0.85
+    }, initials));
+  }
+
   // Resize handles (transparent hit targets at left/right edges)
   const EDGE_W = 8;
   svg.appendChild(svgEl('rect', {
@@ -369,7 +378,7 @@ svgEl_root.addEventListener('pointerup', async (e) => {
   }
 
   try {
-    await api('PUT', `/tasks/${ds.tid}`, { name: task.name, start: newStart, end: newEnd });
+    await api('PUT', `/tasks/${ds.tid}`, { name: task.name, start: newStart, end: newEnd, assignee: task.assignee || null });
     await loadRoadmap();
   } catch (err) {
     showToast(err.message);
@@ -425,9 +434,14 @@ function openModal(title, fields, onSave, onDelete = null) {
   for (const f of fields) {
     const div = document.createElement('div');
     div.className = 'modal-field';
-    div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
-      <input id="field-${f.name}" name="${f.name}" type="${f.type || 'text'}"
-             value="${f.value || ''}" placeholder="${f.placeholder || ''}" required>`;
+    if (f.type === 'textarea') {
+      div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
+        <textarea id="field-${f.name}" name="${f.name}" placeholder="${f.placeholder || ''}" rows="8"></textarea>`;
+    } else {
+      div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
+        <input id="field-${f.name}" name="${f.name}" type="${f.type || 'text'}"
+               value="${f.value || ''}" placeholder="${f.placeholder || ''}"${f.required !== false ? ' required' : ''}>`;
+    }
     fieldsEl.appendChild(div);
   }
 
@@ -507,8 +521,9 @@ function openAddTaskModal(gid) {
     { name: 'name', label: 'Task name', placeholder: 'e.g. Deploy to staging' },
     { name: 'start', label: 'Start date', type: 'date', value: state.start },
     { name: 'end', label: 'End date', type: 'date', value: state.start },
+    { name: 'assignee', label: 'Assignee', placeholder: 'e.g. Alice', required: false },
   ], async (data) => {
-    await api('POST', `/groups/${gid}/tasks`, data);
+    await api('POST', `/groups/${gid}/tasks`, { name: data.name, start: data.start, end: data.end, assignee: data.assignee || null });
   });
 }
 
@@ -522,8 +537,9 @@ function openEditTaskModal(tid) {
     { name: 'name', label: 'Task name', value: task.name },
     { name: 'start', label: 'Start date', type: 'date', value: task.start },
     { name: 'end', label: 'End date', type: 'date', value: task.end },
+    { name: 'assignee', label: 'Assignee', value: task.assignee || '', required: false },
   ], async (data) => {
-    await api('PUT', `/tasks/${tid}`, data);
+    await api('PUT', `/tasks/${tid}`, { name: data.name, start: data.start, end: data.end, assignee: data.assignee || null });
   }, async () => {
     await api('DELETE', `/tasks/${tid}`);
   });
@@ -544,6 +560,42 @@ document.getElementById('btn-zoom-in').addEventListener('click', () => applyZoom
 document.getElementById('btn-zoom-out').addEventListener('click', () => applyZoom(-1));
 
 document.getElementById('btn-add-group').addEventListener('click', openAddGroupModal);
+
+document.getElementById('btn-import').addEventListener('click', () => {
+  openModal('Import YAML', [
+    { name: 'yaml', label: 'Paste YAML', type: 'textarea', placeholder: 'title: My Roadmap\n...' },
+    { name: 'url', label: 'Or fetch from URL', placeholder: 'https://...', required: false },
+  ], async (data) => {
+    let text = data.yaml.trim();
+    if (!text && data.url.trim()) {
+      const res = await fetch(data.url.trim());
+      if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+      text = await res.text();
+    }
+    if (!text) throw new Error('Provide YAML text or a URL');
+    await api('POST', '/roadmap/import', text, 'text/plain');
+  });
+});
+
+document.getElementById('btn-export-png').addEventListener('click', () => {
+  const svg = document.getElementById('roadmap-svg');
+  const svgData = new XMLSerializer().serializeToString(svg);
+  const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = svg.width.baseVal.value;
+    canvas.height = svg.height.baseVal.value;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    const a = document.createElement('a');
+    a.download = 'roadmap.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  };
+  img.src = url;
+});
 
 document.getElementById('btn-export').addEventListener('click', async () => {
   try {
