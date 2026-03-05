@@ -119,7 +119,7 @@ function renderSVG() {
     totalH += GROUP_H;
     if (!g.collapsed) totalH += g.tasks.length * TASK_H;
   }
-  totalH += 10;
+  totalH += GROUP_H + 10; // "+ Add group" row
 
   svg.setAttribute('width', svgW);
   svg.setAttribute('height', totalH);
@@ -160,6 +160,15 @@ function renderSVG() {
     }
     groupYPos.push({ gid: g.id, y: groupStartY, h: y - groupStartY });
   }
+
+  // "+ Add group" row
+  svg.appendChild(svgEl('rect', { x: 0, y, width: LABEL_W, height: GROUP_H, fill: '#fafafa' }));
+  svg.appendChild(svgEl('line', { x1: 0, y1: y, x2: LABEL_W, y2: y, stroke: '#e0e0e0', 'stroke-width': 1 }));
+  svg.appendChild(svgEl('text', {
+    x: 20, y: y + GROUP_H / 2 + 5,
+    fill: '#9ca3af', 'font-size': 13, cursor: 'pointer',
+    'data-action': 'add-group',
+  }, '+ Add group'));
 
   // Label panel separator
   svg.appendChild(svgEl('line', {
@@ -279,7 +288,8 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
   // Task name label (left panel)
   svg.appendChild(svgEl('text', {
     x: 12, y: y + TASK_H / 2 + 4,
-    fill: '#374151', 'font-size': 12
+    fill: '#374151', 'font-size': 12, cursor: 'pointer',
+    'data-action': 'edit-task', 'data-tid': t.id
   }, truncate(t.name, 28)));
 
   const isMilestone = t.start === t.end;
@@ -461,7 +471,7 @@ const svgEl_root = document.getElementById('roadmap-svg');
 
 svgEl_root.addEventListener('pointerdown', (e) => {
   const el = e.target;
-  if (el.dataset.action === 'edit-task' && !el.dataset.milestone) {
+  if (el.dataset.action === 'edit-task' && !el.dataset.milestone && el.tagName === 'rect') {
     const task = findTask(el.dataset.tid);
     if (!task) return;
     dragState = {
@@ -625,7 +635,9 @@ svgEl_root.addEventListener('click', async (e) => {
   const tid = e.target.dataset.tid;
 
   try {
-    if (action === 'toggle-group') {
+    if (action === 'add-group') {
+      openAddGroupModal();
+    } else if (action === 'toggle-group') {
       const g = state.groups.find(g => g.id === gid);
       await api('PUT', `/groups/${gid}`, { name: g.name, color: g.color, collapsed: !g.collapsed, depends_on: g.depends_on || [] });
       await loadRoadmap();
@@ -633,7 +645,7 @@ svgEl_root.addEventListener('click', async (e) => {
       openEditGroupModal(gid);
     } else if (action === 'add-task') {
       openAddTaskModal(gid);
-    } else if (action === 'edit-task') {
+    } else if (action === 'edit-task' || action === 'resize-task') {
       openEditTaskModal(tid);
     }
   } catch (err) {
@@ -821,8 +833,6 @@ document.getElementById('btn-zoom-out').addEventListener('click', () => applyZoo
 document.getElementById('btn-today').addEventListener('click', scrollToToday);
 document.getElementById('btn-undo').addEventListener('click', undo);
 document.getElementById('btn-redo').addEventListener('click', redo);
-
-document.getElementById('btn-add-group').addEventListener('click', openAddGroupModal);
 
 document.getElementById('btn-import').addEventListener('click', () => {
   openModal('Import YAML', [

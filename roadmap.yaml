@@ -32,8 +32,21 @@ groups:
     name: Online assessments
     start: '2026-05-31'
     end: '2026-08-19'
-    assignee:
+    assignee: Gerasimos
     depends_on:
     - task2
+    progress:
+  depends_on: []
+- id: phase_3_c0fb1a
+  name: Phase 3
+  color: '#ae4c80'
+  collapsed: false
+  tasks:
+  - id: some_task_here_2d604c
+    name: Some task here
+    start: '2026-01-31'
+    end: '2026-03-28'
+    assignee: Henk
+    depends_on: []
     progress:
   depends_on: []
