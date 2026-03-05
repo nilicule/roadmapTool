@@ -28,6 +28,7 @@ let barPos = {};      // tid/gid → { x, y, w, h, midY } for dependency arrows
 let groupYPos = [];   // [{gid, y, h}] for drag-to-reorder
 let reorderIndicator = null; // <line> shown during group reorder drag
 let _hoverTid = null;
+let _hidePopupTimer = null;
 let selectedTid = null;
 
 // ============================================================
@@ -787,6 +788,49 @@ svgEl_root.addEventListener('click', async (e) => {
 window.addEventListener('resize', () => render());
 
 // ============================================================
+// Task hover popup
+// ============================================================
+function showTaskPopup(tid) {
+  const task = findTask(tid);
+  if (!task) return;
+  const pos = barPos[tid];
+  if (!pos) return;
+  const popup = document.getElementById('task-popup');
+  const container = document.querySelector('.chart-container');
+
+  // Tags
+  const tagsEl = document.getElementById('task-popup-tags');
+  tagsEl.innerHTML = '';
+  for (const tag of (task.tags || [])) {
+    const pill = document.createElement('span');
+    pill.className = 'tag-pill';
+    pill.style.background = tagColor(tag);
+    pill.textContent = tag;
+    tagsEl.appendChild(pill);
+  }
+
+  // Assignee
+  document.getElementById('task-popup-assignee').textContent =
+    task.assignee ? `👤 ${task.assignee}` : '👤 —';
+
+  // Position: below the bar, clamped to container width
+  const left = pos.x - container.scrollLeft;
+  const top = pos.y + pos.h + 6 - container.scrollTop;
+  const maxLeft = container.clientWidth - 280;
+  popup.style.left = `${Math.max(0, Math.min(left, maxLeft))}px`;
+  popup.style.top = `${top}px`;
+
+  clearTimeout(_hidePopupTimer);
+  popup.classList.add('visible');
+}
+
+function hideTaskPopup() {
+  _hidePopupTimer = setTimeout(() => {
+    document.getElementById('task-popup').classList.remove('visible');
+  }, 120);
+}
+
+// ============================================================
 // Dependency chain hover highlighting
 // ============================================================
 function applyChainHighlight(tid) {
@@ -816,14 +860,15 @@ svgEl_root.addEventListener('mousemove', (e) => {
   const newTid = (tid && findTask(tid)) ? tid : null;
   if (newTid === _hoverTid) return;
   _hoverTid = newTid;
-  if (newTid) applyChainHighlight(newTid);
-  else clearChainHighlight();
+  if (newTid) { applyChainHighlight(newTid); showTaskPopup(newTid); }
+  else { clearChainHighlight(); hideTaskPopup(); }
 });
 
 svgEl_root.addEventListener('mouseleave', () => {
   if (!_hoverTid) return;
   _hoverTid = null;
   clearChainHighlight();
+  hideTaskPopup();
 });
 
 // ============================================================
