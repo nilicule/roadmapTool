@@ -17,15 +17,10 @@ groups:
     end: '2025-03-01'
 - id: phase2
   name: Advanced Modules
-  color: '#1e994d'
+  color: '#2196F3'
   collapsed: false
   tasks:
   - id: task3
     name: Online assessments
     start: '2025-04-01'
     end: '2025-04-30'
-- id: phase_3_59ae9a
-  name: Phase 3
-  color: '#4caf50'
-  collapsed: false
-  tasks: []

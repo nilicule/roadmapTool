@@ -12,6 +12,9 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 // State
 // ============================================================
 let state = null;  // Roadmap object from API
+let zoomFactor = 1;   // multiplier applied to dayW
+let dayW = 0;         // pixels per day (module-level, set in renderSVG)
+let timeStart = null; // Date object (module-level, set in renderSVG)
 
 // ============================================================
 // Date utilities
@@ -76,10 +79,12 @@ function renderSVG() {
   svg.innerHTML = '';
 
   const containerW = Math.max(svg.parentElement.clientWidth - 40, 900);
-  const timeStart = parseDate(state.start);
+  timeStart = parseDate(state.start);
   const timeEnd   = parseDate(state.end);
   const totalDays = daysDiff(timeStart, timeEnd);
-  const dayW = (containerW - LABEL_W) / totalDays;
+  const baseDayW = (containerW - LABEL_W) / totalDays;
+  dayW = baseDayW * zoomFactor;
+  const svgW = LABEL_W + totalDays * dayW;
 
   // Compute total height
   let totalH = HEADER_H;
@@ -89,15 +94,15 @@ function renderSVG() {
   }
   totalH += 10;
 
-  svg.setAttribute('width', containerW);
+  svg.setAttribute('width', svgW);
   svg.setAttribute('height', totalH);
-  svg.setAttribute('viewBox', `0 0 ${containerW} ${totalH}`);
+  svg.setAttribute('viewBox', `0 0 ${svgW} ${totalH}`);
 
   // Background
-  svg.appendChild(svgEl('rect', { x: 0, y: 0, width: containerW, height: totalH, fill: '#fff' }));
+  svg.appendChild(svgEl('rect', { x: 0, y: 0, width: svgW, height: totalH, fill: '#fff' }));
 
   // Month headers
-  renderMonthHeaders(svg, timeStart, timeEnd, totalDays, dayW, containerW, totalH);
+  renderMonthHeaders(svg, timeStart, timeEnd, totalDays, dayW, svgW, totalH);
 
   // Today marker
   const tod = today();
@@ -115,11 +120,11 @@ function renderSVG() {
   // Groups and tasks
   let y = HEADER_H;
   for (const g of state.groups) {
-    renderGroup(svg, g, y, containerW);
+    renderGroup(svg, g, y, svgW);
     y += GROUP_H;
     if (!g.collapsed) {
       for (const t of g.tasks) {
-        renderTask(svg, t, g, y, timeStart, dayW, containerW);
+        renderTask(svg, t, g, y, timeStart, dayW, svgW);
         y += TASK_H;
       }
     }
@@ -184,8 +189,9 @@ function renderGroup(svg, g, y, containerW) {
 
   // "+ task" button
   svg.appendChild(svgEl('text', {
-    x: LABEL_W - 6, y: y + GROUP_H / 2 + 5,
-    fill: '#9ca3af', 'font-size': 11, cursor: 'pointer',
+    x: LABEL_W - 14, y: y + GROUP_H / 2 + 5,
+    fill: '#9ca3af', 'font-size': 12, cursor: 'pointer',
+    'text-anchor': 'middle',
     'data-action': 'add-task', 'data-gid': g.id
   }, '+'));
 }
@@ -219,6 +225,19 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
       fill: '#fff', 'font-size': 11, 'pointer-events': 'none'
     }, truncate(t.name, Math.floor(barW / 7))));
   }
+
+  // Resize handles (transparent hit targets at left/right edges)
+  const EDGE_W = 8;
+  svg.appendChild(svgEl('rect', {
+    x: barX, y: barY, width: EDGE_W, height: barH,
+    fill: 'transparent', cursor: 'ew-resize',
+    'data-action': 'resize-task', 'data-tid': t.id, 'data-edge': 'left'
+  }));
+  svg.appendChild(svgEl('rect', {
+    x: barX + barW - EDGE_W, y: barY, width: EDGE_W, height: barH,
+    fill: 'transparent', cursor: 'ew-resize',
+    'data-action': 'resize-task', 'data-tid': t.id, 'data-edge': 'right'
+  }));
 }
 
 function hexToRgba(hex, alpha) {
@@ -231,9 +250,128 @@ function hexToRgba(hex, alpha) {
 function truncate(s, n) { return s.length <= n ? s : s.slice(0, n - 1) + '…'; }
 
 // ============================================================
+// Drag state
+// ============================================================
+let dragState = null;
+
+function findTask(tid) {
+  for (const g of state.groups)
+    for (const t of g.tasks)
+      if (t.id === tid) return t;
+}
+
+function shiftDate(iso, days) {
+  const d = parseDate(iso);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// ============================================================
 // Event delegation on SVG
 // ============================================================
-document.getElementById('roadmap-svg').addEventListener('click', async (e) => {
+const svgEl_root = document.getElementById('roadmap-svg');
+
+svgEl_root.addEventListener('pointerdown', (e) => {
+  const el = e.target;
+  if (el.dataset.action === 'edit-task') {
+    const task = findTask(el.dataset.tid);
+    if (!task) return;
+    dragState = {
+      type: 'move',
+      tid: el.dataset.tid,
+      barEl: el,
+      startX: e.clientX,
+      origStart: task.start,
+      origEnd: task.end,
+      origBarX: parseFloat(el.getAttribute('x')),
+      hasMoved: false,
+    };
+    svgEl_root.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  } else if (el.dataset.action === 'resize-task') {
+    const task = findTask(el.dataset.tid);
+    if (!task) return;
+    // Walk back to find the bar rect (data-action='edit-task') for this tid
+    let barEl = el.previousElementSibling;
+    while (barEl && !(barEl.dataset.action === 'edit-task' && barEl.dataset.tid === el.dataset.tid)) {
+      barEl = barEl.previousElementSibling;
+    }
+    if (!barEl) return;
+    dragState = {
+      type: el.dataset.edge === 'left' ? 'resize-left' : 'resize-right',
+      tid: el.dataset.tid,
+      barEl,
+      startX: e.clientX,
+      origStart: task.start,
+      origEnd: task.end,
+      origBarX: parseFloat(barEl.getAttribute('x')),
+      origBarW: parseFloat(barEl.getAttribute('width')),
+      hasMoved: false,
+    };
+    svgEl_root.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+});
+
+svgEl_root.addEventListener('pointermove', (e) => {
+  if (!dragState) return;
+  const dx = e.clientX - dragState.startX;
+  if (Math.abs(dx) > 5) dragState.hasMoved = true;
+  if (!dragState.hasMoved) return;
+
+  if (dragState.type === 'move') {
+    const newX = dragState.origBarX + dx;
+    dragState.barEl.setAttribute('x', newX);
+    const labelEl = dragState.barEl.nextElementSibling;
+    if (labelEl && labelEl.tagName === 'text') {
+      labelEl.setAttribute('x', newX + 6);
+    }
+  } else if (dragState.type === 'resize-left') {
+    const newX = Math.min(dragState.origBarX + dx, dragState.origBarX + dragState.origBarW - 4);
+    const newW = dragState.origBarW - (newX - dragState.origBarX);
+    dragState.barEl.setAttribute('x', newX);
+    dragState.barEl.setAttribute('width', Math.max(4, newW));
+  } else if (dragState.type === 'resize-right') {
+    dragState.barEl.setAttribute('width', Math.max(4, dragState.origBarW + dx));
+  }
+});
+
+svgEl_root.addEventListener('pointerup', async (e) => {
+  if (!dragState) return;
+  const ds = dragState;
+  dragState = null;
+  if (!ds.hasMoved) return;  // pure click — let click handler fire
+
+  const dx = e.clientX - ds.startX;
+  const task = findTask(ds.tid);
+  let newStart, newEnd;
+
+  if (ds.type === 'move') {
+    const dayDelta = Math.round(dx / dayW);
+    if (dayDelta === 0) { render(); return; }
+    newStart = shiftDate(ds.origStart, dayDelta);
+    newEnd   = shiftDate(ds.origEnd,   dayDelta);
+  } else if (ds.type === 'resize-left') {
+    const dayDelta = Math.round(dx / dayW);
+    newStart = shiftDate(ds.origStart, dayDelta);
+    newEnd   = ds.origEnd;
+  } else if (ds.type === 'resize-right') {
+    const dayDelta = Math.round(dx / dayW);
+    newStart = ds.origStart;
+    newEnd   = shiftDate(ds.origEnd, dayDelta);
+  }
+
+  try {
+    await api('PUT', `/tasks/${ds.tid}`, { name: task.name, start: newStart, end: newEnd });
+    await loadRoadmap();
+  } catch (err) {
+    showToast(err.message);
+    render();
+  }
+});
+
+svgEl_root.addEventListener('click', async (e) => {
+  if (dragState && dragState.hasMoved) return;
   const action = e.target.dataset.action;
   if (!action) return;
   const gid = e.target.dataset.gid;
@@ -384,6 +522,20 @@ function openEditTaskModal(tid) {
 // ============================================================
 // Toolbar buttons
 // ============================================================
+// ============================================================
+// Zoom controls
+// ============================================================
+const ZOOM_STEPS = [0.5, 1, 2, 4, 8];
+function applyZoom(delta) {
+  const idx = ZOOM_STEPS.indexOf(zoomFactor);
+  const next = Math.max(0, Math.min(ZOOM_STEPS.length - 1, idx + delta));
+  zoomFactor = ZOOM_STEPS[next];
+  document.getElementById('zoom-label').textContent = `${zoomFactor}×`;
+  render();
+}
+document.getElementById('btn-zoom-in').addEventListener('click', () => applyZoom(+1));
+document.getElementById('btn-zoom-out').addEventListener('click', () => applyZoom(-1));
+
 document.getElementById('btn-add-group').addEventListener('click', openAddGroupModal);
 
 document.getElementById('btn-export').addEventListener('click', async () => {
