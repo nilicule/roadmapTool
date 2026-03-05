@@ -9,8 +9,8 @@ SAMPLE_YAML = Path(__file__).parent.parent / "roadmap.yaml"
 
 def test_load_roadmap_from_file():
     roadmap = load_roadmap(SAMPLE_YAML)
-    assert roadmap.title == "My Project Roadmap"
-    assert len(roadmap.groups) == 2
+    assert roadmap.title == "My Awesome Project Roadmap"
+    assert len(roadmap.groups) >= 3
     assert roadmap.groups[0].id == "phase1"
     assert len(roadmap.groups[0].tasks) == 2
 

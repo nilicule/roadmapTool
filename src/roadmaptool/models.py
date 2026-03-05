@@ -79,3 +79,31 @@ class Roadmap(BaseModel):
                     raise ValueError(f"duplicate task id: {task.id!r}")
                 seen.add(task.id)
         return self
+
+    @model_validator(mode='after')
+    def check_no_dependency_cycles(self):
+        deps: dict[str, list[str]] = {}
+        for g in self.groups:
+            for t in g.tasks:
+                deps[t.id] = list(t.depends_on)
+            deps[g.id] = list(g.depends_on)
+
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color = {n: WHITE for n in deps}
+
+        def dfs(n: str) -> bool:
+            color[n] = GRAY
+            for dep in deps.get(n, []):
+                if dep not in color:
+                    continue
+                if color[dep] == GRAY:
+                    return True
+                if color[dep] == WHITE and dfs(dep):
+                    return True
+            color[n] = BLACK
+            return False
+
+        for n in list(color.keys()):
+            if color[n] == WHITE and dfs(n):
+                raise ValueError("dependency graph contains a cycle")
+        return self

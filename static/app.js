@@ -27,6 +27,8 @@ let timeStart = null; // Date object (module-level, set in renderSVG)
 let barPos = {};      // tid/gid → { x, y, w, h, midY } for dependency arrows
 let groupYPos = [];   // [{gid, y, h}] for drag-to-reorder
 let reorderIndicator = null; // <line> shown during group reorder drag
+let _hoverTid = null;
+let selectedTid = null;
 
 // ============================================================
 // Date utilities
@@ -128,6 +130,7 @@ function renderSVG() {
   // Background
   svg.appendChild(svgEl('rect', { x: 0, y: 0, width: svgW, height: totalH, fill: '#fff' }));
 
+
   // Month headers
   renderMonthHeaders(svg, timeStart, timeEnd, totalDays, dayW, svgW, totalH);
 
@@ -144,10 +147,20 @@ function renderSVG() {
     }));
   }
 
+  // "+ Add group" row (top of label column)
+  let y = HEADER_H;
+  svg.appendChild(svgEl('rect', { x: 0, y, width: LABEL_W, height: GROUP_H, fill: '#fafafa' }));
+  svg.appendChild(svgEl('line', { x1: 0, y1: y, x2: LABEL_W, y2: y, stroke: '#e0e0e0', 'stroke-width': 1 }));
+  svg.appendChild(svgEl('text', {
+    x: 20, y: y + GROUP_H / 2 + 5,
+    fill: '#9ca3af', 'font-size': 13, cursor: 'pointer',
+    'data-action': 'add-group',
+  }, '+ Add group'));
+  y += GROUP_H;
+
   // Groups and tasks
   barPos = {};
   groupYPos = [];
-  let y = HEADER_H;
   for (const g of state.groups) {
     const groupStartY = y;
     renderGroup(svg, g, y, svgW);
@@ -160,15 +173,6 @@ function renderSVG() {
     }
     groupYPos.push({ gid: g.id, y: groupStartY, h: y - groupStartY });
   }
-
-  // "+ Add group" row
-  svg.appendChild(svgEl('rect', { x: 0, y, width: LABEL_W, height: GROUP_H, fill: '#fafafa' }));
-  svg.appendChild(svgEl('line', { x1: 0, y1: y, x2: LABEL_W, y2: y, stroke: '#e0e0e0', 'stroke-width': 1 }));
-  svg.appendChild(svgEl('text', {
-    x: 20, y: y + GROUP_H / 2 + 5,
-    fill: '#9ca3af', 'font-size': 13, cursor: 'pointer',
-    'data-action': 'add-group',
-  }, '+ Add group'));
 
   // Label panel separator
   svg.appendChild(svgEl('line', {
@@ -229,13 +233,26 @@ function renderGroup(svg, g, y, containerW) {
     'data-action': 'reorder-group', 'data-gid': g.id,
   }, '\u2630'));
 
-  // Collapse toggle + group name (shifted from x:14 → x:20)
+  // Compute aggregate progress (duration-weighted) for label
+  let groupProgressLabel = '';
+  const tasksWithProgress = g.tasks.filter(t => t.progress != null);
+  if (tasksWithProgress.length > 0) {
+    const totalDays = tasksWithProgress.reduce((s, t) => s + Math.max(1, daysDiff(parseDate(t.start), parseDate(t.end))), 0);
+    const avg = Math.round(tasksWithProgress.reduce((s, t) => s + t.progress * Math.max(1, daysDiff(parseDate(t.start), parseDate(t.end))), 0) / totalDays);
+    groupProgressLabel = ` (${avg}%)`;
+  }
+
+  // Collapse toggle + group name
   const arrow = g.collapsed ? '▶' : '▼';
+  // Truncate name to leave room for progress suffix and the edit/+ buttons
+  // Available ~19 chars total (145px at ~7.5px/char, 13px bold)
+  const maxNameChars = groupProgressLabel ? 19 - groupProgressLabel.length : 19;
+  const groupNameLabel = `${arrow} ${truncate(g.name, maxNameChars - 2)}${groupProgressLabel}`;
   svg.appendChild(svgEl('text', {
     x: 20, y: y + GROUP_H / 2 + 5,
     fill: g.color, 'font-size': 13, 'font-weight': '600', cursor: 'pointer',
     'data-action': 'toggle-group', 'data-gid': g.id
-  }, `${arrow} ${g.name}`));
+  }, groupNameLabel));
 
   // Edit button — \uFE0E forces text (not emoji) rendering of ✎
   svg.appendChild(svgEl('text', {
@@ -264,14 +281,6 @@ function renderGroup(svg, g, y, containerW) {
     const gBarH = 8;
     const gBarY = y + (GROUP_H - gBarH) / 2;
     barPos[g.id] = { x: gBarX, y: gBarY, w: gBarW, h: gBarH, midY: gBarY + gBarH / 2 };
-    const tasksWithProgress = g.tasks.filter(t => t.progress != null);
-    if (tasksWithProgress.length > 0) {
-      const avg = Math.round(tasksWithProgress.reduce((s, t) => s + t.progress, 0) / tasksWithProgress.length);
-      svg.appendChild(svgEl('text', {
-        x: LABEL_W - 60, y: y + GROUP_H / 2 + 5,
-        fill: '#6b7280', 'font-size': 11, 'text-anchor': 'middle', 'pointer-events': 'none'
-      }, `${avg}%`));
-    }
     if (g.collapsed) {
       svg.appendChild(svgEl('rect', {
         x: gBarX, y: gBarY, width: gBarW, height: gBarH,
@@ -303,6 +312,13 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
       fill: g.color, opacity: 0.9, cursor: 'pointer',
       'data-action': 'edit-task', 'data-tid': t.id, 'data-milestone': '1'
     }));
+    if (t.id === selectedTid) {
+      const SR = R + 4;
+      svg.appendChild(svgEl('polygon', {
+        points: `${cx},${cy-SR} ${cx+SR},${cy} ${cx},${cy+SR} ${cx-SR},${cy}`,
+        fill: 'none', stroke: '#2563eb', 'stroke-width': 2, 'pointer-events': 'none'
+      }));
+    }
     barPos[t.id] = { x: cx, y: cy - R, w: 0, h: R * 2, midY: cy };
     return;
   }
@@ -332,7 +348,8 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
   if (barW > 30) {
     svg.appendChild(svgEl('text', {
       x: barX + 6, y: barY + barH / 2 + 4,
-      fill: '#fff', 'font-size': 11, 'pointer-events': 'none'
+      fill: '#fff', 'font-size': 11, 'pointer-events': 'none',
+      'data-tid': t.id
     }, truncate(t.name, Math.floor(barW / 7))));
   }
 
@@ -359,6 +376,13 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
   }));
 
   barPos[t.id] = { x: barX, y: barY, w: barW, h: barH, midY: barY + barH / 2 };
+
+  if (t.id === selectedTid) {
+    svg.appendChild(svgEl('rect', {
+      x: barX - 2, y: barY - 2, width: barW + 4, height: barH + 4,
+      rx: 6, fill: 'none', stroke: '#2563eb', 'stroke-width': 2, 'pointer-events': 'none'
+    }));
+  }
 }
 
 function findGroupForTask(tid) {
@@ -370,12 +394,14 @@ function findGroupForTask(tid) {
 
 function renderDependencyArrows(svg) {
   const defs = svgEl('defs', {});
-  const marker = svgEl('marker', {
-    id: 'dep-arrow', markerWidth: '8', markerHeight: '8',
-    refX: '6', refY: '3', orient: 'auto', markerUnits: 'userSpaceOnUse',
-  });
-  marker.appendChild(svgEl('polygon', { points: '0,0 6,3 0,6', fill: '#94a3b8' }));
-  defs.appendChild(marker);
+  for (const [id, color] of [['dep-arrow', '#94a3b8'], ['dep-arrow-warn', '#f59e0b']]) {
+    const marker = svgEl('marker', {
+      id, markerWidth: '8', markerHeight: '8',
+      refX: '6', refY: '3', orient: 'auto', markerUnits: 'userSpaceOnUse',
+    });
+    marker.appendChild(svgEl('polygon', { points: '0,0 6,3 0,6', fill: color }));
+    defs.appendChild(marker);
+  }
   svg.appendChild(defs);
 
   const pairs = [];
@@ -392,11 +418,16 @@ function renderDependencyArrows(svg) {
     const to   = barPos[toId]   ?? barPos[findGroupForTask(toId)?.id];
     if (!from || !to) continue;
 
+    const fromTask = findTask(fromId);
+    const toTask   = findTask(toId);
+    const isViolation = fromTask && toTask &&
+      parseDate(toTask.start) < parseDate(fromTask.end);
+    const stroke = isViolation ? '#f59e0b' : '#94a3b8';
+    const markerId = isViolation ? 'dep-arrow-warn' : 'dep-arrow';
+
     const x2 = to.x, y2 = to.midY;
     let d;
     if (to.x < from.x + from.w) {
-      // Overlap: drop from predecessor's bottom at a point left of the dependent,
-      // then go right to its left edge (└──→ shape)
       const dropX = Math.max(from.x, to.x - 10);
       d = `M ${dropX} ${from.y + from.h} L ${dropX} ${y2} L ${x2} ${y2}`;
     } else {
@@ -409,8 +440,9 @@ function renderDependencyArrows(svg) {
       }
     }
     svg.appendChild(svgEl('path', {
-      d, stroke: '#94a3b8', 'stroke-width': '1.5', fill: 'none',
-      'marker-end': 'url(#dep-arrow)', 'pointer-events': 'none',
+      d, stroke, 'stroke-width': isViolation ? '2' : '1.5', fill: 'none',
+      'marker-end': `url(#${markerId})`, 'pointer-events': 'none',
+      'data-dep': `${fromId}:${toId}`,
     }));
   }
 }
@@ -458,10 +490,65 @@ function findTask(tid) {
       if (t.id === tid) return t;
 }
 
+// Returns Set of task IDs that transitively depend on tid (downstream)
+function getDownstream(tid) {
+  const result = new Set();
+  const queue = [tid];
+  while (queue.length) {
+    const id = queue.shift();
+    for (const g of state.groups)
+      for (const t of g.tasks)
+        if ((t.depends_on || []).includes(id) && !result.has(t.id)) {
+          result.add(t.id);
+          queue.push(t.id);
+        }
+  }
+  return result;
+}
+
+// Returns Set of task IDs that tid transitively depends on (upstream)
+function getUpstream(tid) {
+  const result = new Set();
+  const queue = [tid];
+  while (queue.length) {
+    const id = queue.shift();
+    const t = findTask(id);
+    for (const depId of (t?.depends_on || []))
+      if (!result.has(depId)) { result.add(depId); queue.push(depId); }
+  }
+  return result;
+}
+
+// Would adding "taskId depends_on depId" create a cycle?
+function wouldCreateCycle(depId, taskId) {
+  if (depId === taskId) return true;
+  return getDownstream(taskId).has(depId);
+}
+
+function isModalOpen() {
+  return !document.getElementById('modal-overlay').classList.contains('hidden');
+}
+
+function getVisibleTaskIds() {
+  const ids = [];
+  for (const g of state.groups)
+    if (!g.collapsed)
+      for (const t of g.tasks) ids.push(t.id);
+  return ids;
+}
+
+function scrollTaskIntoView(tid) {
+  const pos = barPos[tid];
+  if (!pos) return;
+  const container = document.querySelector('.chart-container');
+  const midX = pos.x + pos.w / 2;
+  if (midX < container.scrollLeft + LABEL_W || midX > container.scrollLeft + container.clientWidth)
+    container.scrollLeft = midX - container.clientWidth / 2;
+}
+
 function shiftDate(iso, days) {
-  const d = parseDate(iso);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
 // ============================================================
@@ -601,19 +688,31 @@ svgEl_root.addEventListener('pointerup', async (e) => {
 
   const dx = e.clientX - ds.startX;
   const task = findTask(ds.tid);
-  let newStart, newEnd;
+  const dayDelta = Math.round(dx / dayW);
 
   if (ds.type === 'move') {
-    const dayDelta = Math.round(dx / dayW);
     if (dayDelta === 0) { render(); return; }
-    newStart = shiftDate(ds.origStart, dayDelta);
-    newEnd   = shiftDate(ds.origEnd,   dayDelta);
-  } else if (ds.type === 'resize-left') {
-    const dayDelta = Math.round(dx / dayW);
+    // Shift moved task and all downstream tasks
+    const downstream = getDownstream(ds.tid);
+    const snapshot = JSON.parse(JSON.stringify(state));
+    for (const g of snapshot.groups)
+      for (const t of g.tasks)
+        if (t.id === ds.tid || downstream.has(t.id)) {
+          t.start = shiftDate(t.start, dayDelta);
+          t.end   = shiftDate(t.end,   dayDelta);
+        }
+    try {
+      await api('PUT', '/roadmap/restore', snapshot);
+      await loadRoadmap();
+    } catch (err) { showToast(err.message); render(); }
+    return;
+  }
+
+  let newStart, newEnd;
+  if (ds.type === 'resize-left') {
     newStart = shiftDate(ds.origStart, dayDelta);
     newEnd   = ds.origEnd;
   } else if (ds.type === 'resize-right') {
-    const dayDelta = Math.round(dx / dayW);
     newStart = ds.origStart;
     newEnd   = shiftDate(ds.origEnd, dayDelta);
   }
@@ -625,6 +724,16 @@ svgEl_root.addEventListener('pointerup', async (e) => {
     showToast(err.message);
     render();
   }
+});
+
+svgEl_root.addEventListener('dblclick', (e) => {
+  // Double-clicking anywhere on a task bar or its label always opens the modal
+  const el = e.target;
+  const tid = el.dataset.tid;
+  if (!tid || !findTask(tid)) return;
+  dragState = null; // cancel any drag in progress
+  e.preventDefault();
+  openEditTaskModal(tid);
 });
 
 svgEl_root.addEventListener('click', async (e) => {
@@ -654,6 +763,46 @@ svgEl_root.addEventListener('click', async (e) => {
 });
 
 window.addEventListener('resize', () => render());
+
+// ============================================================
+// Dependency chain hover highlighting
+// ============================================================
+function applyChainHighlight(tid) {
+  const chain = new Set([tid, ...getUpstream(tid), ...getDownstream(tid)]);
+  for (const el of svgEl_root.querySelectorAll('[data-tid]')) {
+    el.style.opacity = chain.has(el.dataset.tid) ? '1' : '0.15';
+  }
+  for (const el of svgEl_root.querySelectorAll('[data-dep]')) {
+    const [from, to] = el.dataset.dep.split(':');
+    const inChain = chain.has(from) && chain.has(to);
+    el.style.opacity = inChain ? '1' : '0.05';
+    if (inChain) el.style.strokeWidth = '2.5';
+  }
+}
+
+function clearChainHighlight() {
+  for (const el of svgEl_root.querySelectorAll('[data-tid]'))
+    el.style.opacity = '';
+  for (const el of svgEl_root.querySelectorAll('[data-dep]')) {
+    el.style.opacity = '';
+    el.style.strokeWidth = '';
+  }
+}
+
+svgEl_root.addEventListener('mousemove', (e) => {
+  const tid = e.target.dataset.tid;
+  const newTid = (tid && findTask(tid)) ? tid : null;
+  if (newTid === _hoverTid) return;
+  _hoverTid = newTid;
+  if (newTid) applyChainHighlight(newTid);
+  else clearChainHighlight();
+});
+
+svgEl_root.addEventListener('mouseleave', () => {
+  if (!_hoverTid) return;
+  _hoverTid = null;
+  clearChainHighlight();
+});
 
 // ============================================================
 // Toast
@@ -729,10 +878,58 @@ function closeModal() {
 }
 
 document.getElementById('modal-cancel').addEventListener('click', closeModal);
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', async (e) => {
   if (e.key === 'Escape') { closeModal(); return; }
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); }
-  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return; }
+
+  if (isModalOpen() || e.ctrlKey || e.metaKey || e.altKey) return;
+
+  if (e.key === 'g') { e.preventDefault(); openAddGroupModal(); return; }
+  if (e.key === 't') {
+    e.preventDefault();
+    const gid = (selectedTid ? findGroupForTask(selectedTid)?.id : null) ?? state?.groups[0]?.id;
+    if (gid) openAddTaskModal(gid);
+    return;
+  }
+  if (e.key === 'Enter' && selectedTid) { e.preventDefault(); openEditTaskModal(selectedTid); return; }
+
+  if (!state) return;
+  const ids = getVisibleTaskIds();
+  if (!ids.length) return;
+
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!selectedTid || !ids.includes(selectedTid)) {
+      selectedTid = e.key === 'ArrowDown' ? ids[0] : ids[ids.length - 1];
+    } else {
+      const idx = ids.indexOf(selectedTid);
+      selectedTid = ids[e.key === 'ArrowDown' ? Math.min(idx + 1, ids.length - 1) : Math.max(idx - 1, 0)];
+    }
+    render();
+    scrollTaskIntoView(selectedTid);
+    return;
+  }
+
+  if (e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && selectedTid) {
+    e.preventDefault();
+    const task = findTask(selectedTid);
+    if (!task) return;
+    const delta = e.key === 'ArrowRight' ? 1 : -1;
+    const downstream = getDownstream(selectedTid);
+    const snapshot = JSON.parse(JSON.stringify(state));
+    for (const g of snapshot.groups)
+      for (const t of g.tasks)
+        if (t.id === selectedTid || downstream.has(t.id)) {
+          t.start = shiftDate(t.start, delta);
+          t.end   = shiftDate(t.end,   delta);
+        }
+    try {
+      await api('PUT', '/roadmap/restore', snapshot);
+      await loadRoadmap();
+      scrollTaskIntoView(selectedTid);
+    } catch (err) { showToast(err.message); }
+  }
 });
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
@@ -796,7 +993,8 @@ function openEditTaskModal(tid) {
   const taskOptions = [{ value: '', label: '(none)' }];
   for (const g of state.groups)
     for (const t of g.tasks)
-      if (t.id !== tid) taskOptions.push({ value: t.id, label: `${g.name} / ${t.name}` });
+      if (t.id !== tid && !wouldCreateCycle(t.id, tid))
+        taskOptions.push({ value: t.id, label: `${g.name} / ${t.name}` });
   const currentDep = (task.depends_on?.length > 0) ? task.depends_on[0] : '';
   openModal('Edit Task', [
     { name: 'name', label: 'Task name', value: task.name },
@@ -806,6 +1004,8 @@ function openEditTaskModal(tid) {
     { name: 'depends_on', label: 'Depends on', type: 'select', value: currentDep, options: taskOptions },
     { name: 'progress', label: 'Progress (%)', type: 'number', value: task.progress ?? '', required: false, placeholder: '0–100' },
   ], async (data) => {
+    if (data.depends_on && wouldCreateCycle(data.depends_on, tid))
+      throw new Error('This dependency would create a cycle');
     await api('PUT', `/tasks/${tid}`, {
       name: data.name, start: data.start, end: data.end, assignee: data.assignee || null,
       depends_on: data.depends_on ? [data.depends_on] : [],

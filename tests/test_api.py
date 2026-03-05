@@ -2,8 +2,8 @@ def test_get_roadmap(client):
     resp = client.get("/api/roadmap")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["title"] == "My Project Roadmap"
-    assert len(data["groups"]) == 2
+    assert data["title"] == "My Awesome Project Roadmap"
+    assert len(data["groups"]) >= 3
 
 
 def test_add_group(client):

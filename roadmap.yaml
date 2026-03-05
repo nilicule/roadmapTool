@@ -13,15 +13,15 @@ groups:
     end: '2026-02-22'
     assignee:
     depends_on: []
-    progress:
+    progress: 20
   - id: task2
     name: ISMS documentation
-    start: '2026-04-10'
-    end: '2026-06-10'
+    start: '2026-04-08'
+    end: '2026-06-08'
     assignee:
     depends_on:
     - task1
-    progress:
+    progress: 60
   depends_on: []
 - id: phase2
   name: Advanced Modules
@@ -30,12 +30,12 @@ groups:
   tasks:
   - id: task3
     name: Online assessments
-    start: '2026-05-31'
-    end: '2026-08-19'
+    start: '2026-06-14'
+    end: '2026-09-02'
     assignee: Gerasimos
     depends_on:
     - task2
-    progress:
+    progress: 30
   depends_on: []
 - id: phase_3_c0fb1a
   name: Phase 3
@@ -44,9 +44,16 @@ groups:
   tasks:
   - id: some_task_here_2d604c
     name: Some task here
-    start: '2026-01-31'
-    end: '2026-03-28'
+    start: '2026-03-12'
+    end: '2026-04-25'
     assignee: Henk
-    depends_on: []
+    depends_on:
+    - task1
     progress:
+  depends_on: []
+- id: phase_12_c1c712
+  name: Phase 12
+  color: '#4caf50'
+  collapsed: false
+  tasks: []
   depends_on: []
