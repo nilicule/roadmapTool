@@ -42,6 +42,9 @@ function tagColor(tag) {
   for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) % 360;
   return `hsl(${h}, 65%, 48%)`;
 }
+function isOverdue(t) {
+  return parseDate(t.end) < today() && (t.progress ?? 0) < 100;
+}
 
 // ============================================================
 // API
@@ -399,6 +402,14 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
   }));
 
   barPos[t.id] = { x: barX, y: barY, w: barW, h: barH, midY: barY + barH / 2 };
+
+  // Overdue inset border
+  if (isOverdue(t)) {
+    svg.appendChild(svgEl('rect', {
+      x: barX + 1, y: barY + 1, width: barW - 2, height: barH - 2,
+      rx: 3, fill: 'none', stroke: '#dc2626', 'stroke-width': 2, 'pointer-events': 'none'
+    }));
+  }
 
   if (t.id === selectedTid) {
     svg.appendChild(svgEl('rect', {

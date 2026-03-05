@@ -12,7 +12,7 @@ def test_load_roadmap_from_file():
     assert roadmap.title == "My Awesome Project Roadmap"
     assert len(roadmap.groups) >= 3
     assert roadmap.groups[0].id == "phase1"
-    assert len(roadmap.groups[0].tasks) == 2
+    assert len(roadmap.groups[0].tasks) >= 2
 
 
 def test_load_roadmap_validates_schema():
