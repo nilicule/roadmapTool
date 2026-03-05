@@ -131,17 +131,17 @@ function renderSVG() {
   // Month headers
   renderMonthHeaders(svg, timeStart, timeEnd, totalDays, dayW, svgW, totalH);
 
-  // Today marker
+  // Today pill label (drawn before rows so it sits in the header)
   const tod = today();
+  let todayX = null;
   if (tod >= timeStart && tod <= timeEnd) {
-    const tx = LABEL_W + daysDiff(timeStart, tod) * dayW;
-    svg.appendChild(svgEl('line', {
-      x1: tx, y1: HEADER_H, x2: tx, y2: totalH,
-      stroke: '#2563eb', 'stroke-width': 1.5, 'stroke-dasharray': '4,3', opacity: 0.7
+    todayX = LABEL_W + daysDiff(timeStart, tod) * dayW;
+    const tSize = 7;
+    const tY = HEADER_H - 2;
+    svg.appendChild(svgEl('polygon', {
+      points: `${todayX - tSize},${tY - tSize * 1.4} ${todayX + tSize},${tY - tSize * 1.4} ${todayX},${tY}`,
+      fill: '#f87171', opacity: 0.85, 'pointer-events': 'none'
     }));
-    svg.appendChild(svgEl('text', {
-      x: tx + 3, y: HEADER_H - 6, fill: '#2563eb', 'font-size': 11
-    }, 'Today'));
   }
 
   // Groups and tasks
@@ -166,6 +166,14 @@ function renderSVG() {
     x1: LABEL_W, y1: HEADER_H, x2: LABEL_W, y2: totalH,
     stroke: '#e0e0e0', 'stroke-width': 1
   }));
+
+  // Today line (drawn last so it sits on top of all task rows)
+  if (todayX !== null) {
+    svg.appendChild(svgEl('line', {
+      x1: todayX, y1: HEADER_H, x2: todayX, y2: totalH,
+      stroke: '#f87171', 'stroke-width': 1, opacity: 0.5, 'pointer-events': 'none'
+    }));
+  }
 
   renderDependencyArrows(svg);
 }
@@ -830,6 +838,21 @@ document.getElementById('btn-import').addEventListener('click', () => {
     if (!text) throw new Error('Provide YAML text or a URL');
     await api('POST', '/roadmap/import', text, 'text/plain');
   });
+});
+
+document.getElementById('btn-edit-yaml').addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/roadmap/export');
+    const text = await res.text();
+    openModal('Edit YAML', [
+      { name: 'yaml', label: '', type: 'textarea' },
+    ], async (data) => {
+      await api('POST', '/roadmap/import', data.yaml, 'text/plain');
+    });
+    document.getElementById('field-yaml').value = text;
+  } catch (err) {
+    showToast(err.message);
+  }
 });
 
 document.getElementById('btn-export-png').addEventListener('click', () => {

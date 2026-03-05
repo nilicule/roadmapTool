@@ -1,6 +1,6 @@
 title: My Project Roadmap
-start: '2025-01-01'
-end: '2025-12-31'
+start: '2026-01-01'
+end: '2026-12-31'
 groups:
 - id: phase1
   name: Foundation Setup
@@ -9,17 +9,19 @@ groups:
   tasks:
   - id: task1
     name: Basic setup
-    start: '2025-01-14'
-    end: '2025-02-28'
+    start: '2026-01-08'
+    end: '2026-02-22'
     assignee:
     depends_on: []
+    progress:
   - id: task2
     name: ISMS documentation
-    start: '2025-02-17'
-    end: '2025-04-19'
+    start: '2026-04-10'
+    end: '2026-06-10'
     assignee:
     depends_on:
     - task1
+    progress:
   depends_on: []
 - id: phase2
   name: Advanced Modules
@@ -28,8 +30,10 @@ groups:
   tasks:
   - id: task3
     name: Online assessments
-    start: '2025-04-02'
-    end: '2025-06-21'
+    start: '2026-05-31'
+    end: '2026-08-19'
     assignee:
-    depends_on: []
+    depends_on:
+    - task2
+    progress:
   depends_on: []
