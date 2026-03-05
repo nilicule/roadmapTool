@@ -14,6 +14,7 @@ groups:
     assignee:
     depends_on: []
     progress: 20
+    tags: []
   - id: task2
     name: ISMS documentation
     start: '2026-04-08'
@@ -22,6 +23,7 @@ groups:
     depends_on:
     - task1
     progress: 60
+    tags: []
   depends_on: []
 - id: phase2
   name: Advanced Modules
@@ -36,6 +38,9 @@ groups:
     depends_on:
     - task2
     progress: 30
+    tags:
+    - security
+    - backend
   depends_on: []
 - id: phase_3_c0fb1a
   name: Phase 3
@@ -44,12 +49,12 @@ groups:
   tasks:
   - id: some_task_here_2d604c
     name: Some task here
-    start: '2026-03-12'
-    end: '2026-04-25'
+    start: '2026-05-16'
+    end: '2026-06-29'
     assignee: Henk
-    depends_on:
-    - task1
+    depends_on: []
     progress:
+    tags: []
   depends_on: []
 - id: phase_12_c1c712
   name: Phase 12
