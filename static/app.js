@@ -235,7 +235,7 @@ function mutate(fn) {
 // API (import/export only)
 // ============================================================
 async function api(method, path, body, contentType = 'application/json') {
-  const res = await fetch('/api' + path, {
+  const res = await fetch('api' + path, {
     method,
     headers: body ? {'Content-Type': contentType} : {},
     body: body ? (contentType === 'application/json' ? JSON.stringify(body) : body) : undefined,
@@ -1605,7 +1605,7 @@ document.getElementById('btn-import').addEventListener('click', () => {
 
 document.getElementById('btn-edit-yaml').addEventListener('click', async () => {
   try {
-    const res = await fetch('/api/roadmap/export', {
+    const res = await fetch('api/roadmap/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state),
@@ -1649,7 +1649,7 @@ document.getElementById('btn-export-png').addEventListener('click', () => {
 
 document.getElementById('btn-export').addEventListener('click', async () => {
   try {
-    const res = await fetch('/api/roadmap/export', {
+    const res = await fetch('api/roadmap/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state),
@@ -1766,7 +1766,7 @@ async function bootstrap() {
       const res = await fetch(remoteUrl);
       if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
       const text = await res.text();
-      const validated = await fetch('/api/roadmap/import', {
+      const validated = await fetch('api/roadmap/import', {
         method: 'POST', body: text,
         headers: { 'Content-Type': 'text/plain' },
       }).then(r => r.json());
