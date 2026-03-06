@@ -132,6 +132,10 @@ let _hidePopupTimer = null;
 let selectedTid = null;
 let filterState = { assignee: '', tag: '', overdueOnly: false, hideCompleted: false };
 let swimlaneMode = false;
+let urlState = null;   // deep copy of state loaded from ?url=, for revert
+let isReadOnly = false;
+let sourceUrl = null;  // original ?url= value, persisted for the link icon
+let isFromUrl = false; // true only in the session where ?url= was present (not persisted)
 let swimlaneCollapsed = new Set();
 
 // ============================================================
@@ -261,7 +265,14 @@ async function loadRoadmap() {
   if (stored) {
     state = JSON.parse(stored);
   }
+  const storedUrlState = localStorage.getItem('roadmap_url_state_v1');
+  if (storedUrlState) urlState = JSON.parse(storedUrlState);
+  if (localStorage.getItem('roadmap_readonly_v1') === 'true') isReadOnly = true;
+  const storedSourceUrl = localStorage.getItem('roadmap_source_url_v1');
+  if (storedSourceUrl) sourceUrl = storedSourceUrl;
+  // isFromUrl intentionally not restored — badge only shows on direct ?url= load
   render();
+  updateReadOnlyUI();
   if (_firstLoad) { _firstLoad = false; scrollToToday(); }
 }
 
@@ -285,6 +296,7 @@ function render() {
   renderLegend();
   renderFilterBar();
   renderSVG();
+  updateReadOnlyUI();
 }
 
 function renderFilterBar() {
@@ -843,6 +855,7 @@ function shiftDate(iso, days) {
 const svgEl_root = document.getElementById('roadmap-svg');
 
 svgEl_root.addEventListener('pointerdown', (e) => {
+  if (isReadOnly) return;
   const el = e.target;
   if (el.dataset.action === 'edit-task' && !el.dataset.milestone && el.tagName === 'rect') {
     const task = findTask(el.dataset.tid);
@@ -1071,6 +1084,7 @@ svgEl_root.addEventListener('pointerup', async (e) => {
 });
 
 svgEl_root.addEventListener('dblclick', (e) => {
+  if (isReadOnly) return;
   // Double-clicking anywhere on a task bar or its label always opens the modal
   const el = e.target;
   const tid = el.dataset.tid;
@@ -1084,6 +1098,7 @@ svgEl_root.addEventListener('click', async (e) => {
   if (dragState && dragState.hasMoved) return;
   const action = e.target.dataset.action;
   if (!action) return;
+  if (isReadOnly && action !== 'toggle-group') return;
   const gid = e.target.dataset.gid;
   const tid = e.target.dataset.tid;
 
@@ -1314,9 +1329,41 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
 }
 
+function updateReadOnlyUI() {
+  const badge = document.getElementById('readonly-badge');
+  if (badge) badge.classList.toggle('hidden', !isFromUrl);
+  const link = document.getElementById('title-source-link');
+  if (link) {
+    link.classList.toggle('hidden', !sourceUrl);
+    const isDifferent = !!(urlState && state && JSON.stringify(state) !== JSON.stringify(urlState));
+    link.classList.toggle('modified', isDifferent);
+    if (isDifferent) {
+      link.removeAttribute('href');
+      link.title = 'Revert to original';
+    } else if (sourceUrl) {
+      link.href = sourceUrl;
+      link.title = 'Open source URL';
+    }
+  }
+}
+
+document.getElementById('title-source-link').addEventListener('click', (e) => {
+  if (!urlState || !state) return;
+  const isDifferent = JSON.stringify(state) !== JSON.stringify(urlState);
+  if (isDifferent) {
+    e.preventDefault();
+    undoStack.push(JSON.parse(JSON.stringify(state)));
+    redoStack.length = 0;
+    state = JSON.parse(JSON.stringify(urlState));
+    saveState();
+    render();
+  }
+});
+
 document.getElementById('modal-cancel').addEventListener('click', closeModal);
 document.addEventListener('keydown', async (e) => {
   if (e.key === 'Escape') { closeModal(); return; }
+  if (isReadOnly) return;
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); return; }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return; }
 
@@ -1544,7 +1591,7 @@ document.getElementById('btn-zoom-out').addEventListener('click', () => applyZoo
 document.getElementById('btn-today').addEventListener('click', scrollToToday);
 document.getElementById('btn-undo').addEventListener('click', undo);
 document.getElementById('btn-redo').addEventListener('click', redo);
-document.getElementById('btn-new').addEventListener('click', startFresh);
+document.getElementById('btn-new').addEventListener('click', () => { if (isReadOnly) return; startFresh(); });
 document.getElementById('btn-get-started').addEventListener('click', showOnboarding);
 document.getElementById('template-picker-cancel').addEventListener('click', hideTemplatePicker);
 document.getElementById('template-picker-backdrop').addEventListener('click', hideTemplatePicker);
@@ -1585,6 +1632,7 @@ document.getElementById('btn-expand-all').addEventListener('click', () => {
 });
 
 document.getElementById('btn-import').addEventListener('click', () => {
+  if (isReadOnly) return;
   openModal('Import YAML', [
     { name: 'yaml', label: 'Paste YAML', type: 'textarea', placeholder: 'title: My Roadmap\n...' },
     { name: 'url', label: 'Or fetch from URL', placeholder: 'https://...', required: false },
@@ -1620,6 +1668,12 @@ document.getElementById('btn-edit-yaml').addEventListener('click', async () => {
       undoStack.push(JSON.parse(JSON.stringify(state)));
       redoStack.length = 0;
       state = validated;
+      if (isReadOnly) {
+        isReadOnly = false;
+        isFromUrl = false;
+        localStorage.removeItem('roadmap_readonly_v1');
+        updateReadOnlyUI();
+      }
       saveState();
       render();
     });
@@ -1773,6 +1827,13 @@ async function bootstrap() {
         headers: { 'Content-Type': 'text/plain' },
       }).then(r => r.json());
       state = validated;
+      urlState = JSON.parse(JSON.stringify(validated));
+      isReadOnly = true;
+      isFromUrl = true;
+      sourceUrl = remoteUrl;
+      localStorage.setItem('roadmap_url_state_v1', JSON.stringify(urlState));
+      localStorage.setItem('roadmap_readonly_v1', 'true');
+      localStorage.setItem('roadmap_source_url_v1', remoteUrl);
       saveState();
       history.replaceState(null, '', window.location.pathname);
     } catch (err) {
