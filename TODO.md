@@ -4,20 +4,11 @@
 
 - [ ] `Delete`/`Backspace` key shortcut to delete the selected task
 - [ ] Duplicate/copy task — no way to clone an existing task from the UI
-- [ ] Collapse all / Expand all button for groups
 - [ ] Cross-group task move — drag a task row into a different group (currently same-group only)
-- [ ] Show start/end dates in the task hover popup (only name, assignee, and tags are shown today)
-
-## Data model
-
-- [ ] Task notes/description field — free-text per task; not in model or UI
-- [ ] Multiple dependencies per task — the model already stores `depends_on: list[str]` but the edit modal only exposes a single `<select>`; needs a multi-select or tag-input widget
 
 ## Toolbar / Roadmap management
 
 - [ ] Roadmap date range editing from the UI — `PUT /roadmap` exists but there is no button/modal to change the global start/end dates or title
-
----
 
 ## Filtering & Search
 
