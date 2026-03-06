@@ -1249,6 +1249,7 @@ function openModal(title, fields, onSave, onDelete = null) {
             </svg>
           </button>
           <input type="date" style="width:0;height:0;opacity:0;pointer-events:none;position:absolute"
+                 form="__datepicker__"
                  onchange="document.getElementById('field-${f.name}').value=this.value">
         </div>`;
     } else if (f.type === 'select') {
