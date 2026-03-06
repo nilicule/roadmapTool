@@ -309,6 +309,10 @@ function renderFilterBar() {
   const hasFilter = filterState.assignee || filterState.tag || filterState.overdueOnly || filterState.hideCompleted;
   document.getElementById('filter-clear').classList.toggle('hidden', !hasFilter);
   document.getElementById('btn-swimlane').classList.toggle('active', swimlaneMode);
+  const anyExpanded = !swimlaneMode && state.groups.some(g => !g.collapsed);
+  const anyCollapsed = !swimlaneMode && state.groups.some(g => g.collapsed);
+  document.getElementById('btn-collapse-all').classList.toggle('hidden', !anyExpanded);
+  document.getElementById('btn-expand-all').classList.toggle('hidden', !anyCollapsed);
 }
 
 function renderLegend() {
@@ -1568,6 +1572,14 @@ document.getElementById('filter-completed').addEventListener('click', () => {
 document.getElementById('filter-clear').addEventListener('click', () => {
   filterState = { assignee: '', tag: '', overdueOnly: false, hideCompleted: false };
   render();
+});
+document.getElementById('btn-collapse-all').addEventListener('click', () => {
+  if (swimlaneMode) return;
+  mutate(() => { state.groups.forEach(g => { g.collapsed = true; }); });
+});
+document.getElementById('btn-expand-all').addEventListener('click', () => {
+  if (swimlaneMode) return;
+  mutate(() => { state.groups.forEach(g => { g.collapsed = false; }); });
 });
 
 document.getElementById('btn-import').addEventListener('click', () => {

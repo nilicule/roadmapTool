@@ -175,6 +175,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 .btn--filter-clear:hover { background: #fee2e2; }
 .btn--filter-clear.hidden { display: none; }
+#btn-collapse-all.hidden,
+#btn-expand-all.hidden { display: none; }
 
 .template-picker {
   position: fixed; inset: 0;
