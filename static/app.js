@@ -14,6 +14,10 @@ const ZOOM_LEVELS = [
   { label: 'Week',    days: 7   },
 ];
 
+function getColor(varName) {
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+}
+
 const TEMPLATES = [
   {
     id: 'software-launch',
@@ -367,7 +371,7 @@ function renderSVG() {
   svg.setAttribute('viewBox', `0 0 ${svgW} ${totalH}`);
 
   // Background
-  svg.appendChild(svgEl('rect', { x: 0, y: 0, width: svgW, height: totalH, fill: '#fff' }));
+  svg.appendChild(svgEl('rect', { x: 0, y: 0, width: svgW, height: totalH, fill: getColor('--bg-surface') }));
 
 
   // Month headers
@@ -389,11 +393,11 @@ function renderSVG() {
   // "+ Add group" row (top of label column, only in normal mode)
   let y = HEADER_H;
   if (!swimlaneMode) {
-    svg.appendChild(svgEl('rect', { x: 0, y, width: LABEL_W, height: GROUP_H, fill: '#fafafa' }));
-    svg.appendChild(svgEl('line', { x1: 0, y1: y, x2: LABEL_W, y2: y, stroke: '#e0e0e0', 'stroke-width': 1 }));
+    svg.appendChild(svgEl('rect', { x: 0, y, width: LABEL_W, height: GROUP_H, fill: getColor('--bg-alt') }));
+    svg.appendChild(svgEl('line', { x1: 0, y1: y, x2: LABEL_W, y2: y, stroke: getColor('--border'), 'stroke-width': 1 }));
     svg.appendChild(svgEl('text', {
       x: 20, y: y + GROUP_H / 2 + 5,
-      fill: '#9ca3af', 'font-size': 13, cursor: 'pointer',
+      fill: getColor('--text-muted'), 'font-size': 13, cursor: 'pointer',
       'data-action': 'add-group',
     }, '+ Add group'));
     y += GROUP_H;
@@ -421,7 +425,7 @@ function renderSVG() {
   // Label panel separator
   svg.appendChild(svgEl('line', {
     x1: LABEL_W, y1: HEADER_H, x2: LABEL_W, y2: totalH,
-    stroke: '#e0e0e0', 'stroke-width': 1
+    stroke: getColor('--border'), 'stroke-width': 1
   }));
 
   // Today line (drawn last so it sits on top of all task rows)
@@ -436,8 +440,8 @@ function renderSVG() {
 }
 
 function renderMonthHeaders(svg, timeStart, timeEnd, totalDays, dayW, containerW, totalH) {
-  svg.appendChild(svgEl('rect', { x: 0, y: 0, width: containerW, height: HEADER_H, fill: '#f3f4f6' }));
-  svg.appendChild(svgEl('line', { x1: 0, y1: HEADER_H, x2: containerW, y2: HEADER_H, stroke: '#d1d5db', 'stroke-width': 1 }));
+  svg.appendChild(svgEl('rect', { x: 0, y: 0, width: containerW, height: HEADER_H, fill: getColor('--bg-header') }));
+  svg.appendChild(svgEl('line', { x1: 0, y1: HEADER_H, x2: containerW, y2: HEADER_H, stroke: getColor('--border-lighter'), 'stroke-width': 1 }));
 
   let cur = new Date(timeStart);
   cur.setDate(1);
@@ -450,10 +454,10 @@ function renderMonthHeaders(svg, timeStart, timeEnd, totalDays, dayW, containerW
     const mX = LABEL_W + monthStart * dayW;
 
     if (mX < containerW && mW > 0) {
-      svg.appendChild(svgEl('line', { x1: mX, y1: 0, x2: mX, y2: totalH, stroke: '#e5e7eb', 'stroke-width': 1 }));
+      svg.appendChild(svgEl('line', { x1: mX, y1: 0, x2: mX, y2: totalH, stroke: getColor('--border-light'), 'stroke-width': 1 }));
       svg.appendChild(svgEl('text', {
         x: mX + mW / 2, y: HEADER_H / 2 + 5,
-        'text-anchor': 'middle', fill: '#6b7280',
+        'text-anchor': 'middle', fill: getColor('--text-secondary'),
         'font-size': 12, 'font-weight': '500'
       }, `${MONTH_NAMES[cur.getMonth()]} ${cur.getFullYear()}`));
     }
@@ -465,7 +469,7 @@ function renderMonthHeaders(svg, timeStart, timeEnd, totalDays, dayW, containerW
 function renderGroup(svg, g, y, containerW) {
   const bg = hexToRgba(g.color, 0.15);
   svg.appendChild(svgEl('rect', { x: 0, y, width: containerW, height: GROUP_H, fill: bg }));
-  svg.appendChild(svgEl('line', { x1: 0, y1: y, x2: containerW, y2: y, stroke: '#e0e0e0', 'stroke-width': 1 }));
+  svg.appendChild(svgEl('line', { x1: 0, y1: y, x2: containerW, y2: y, stroke: getColor('--border'), 'stroke-width': 1 }));
 
   // Color indicator
   svg.appendChild(svgEl('rect', { x: 0, y, width: 4, height: GROUP_H, fill: g.color }));
@@ -473,7 +477,7 @@ function renderGroup(svg, g, y, containerW) {
   // Drag handle ≡ (hidden in swimlane mode)
   if (!swimlaneMode) svg.appendChild(svgEl('text', {
     x: 8, y: y + GROUP_H / 2 + 5,
-    fill: '#9ca3af', 'font-size': 12, 'text-anchor': 'middle', cursor: 'grab',
+    fill: getColor('--text-muted'), 'font-size': 12, 'text-anchor': 'middle', cursor: 'grab',
     'data-action': 'reorder-group', 'data-gid': g.id,
   }, '\u2630'));
 
@@ -502,7 +506,7 @@ function renderGroup(svg, g, y, containerW) {
     // Edit button — \uFE0E forces text (not emoji) rendering of ✎
     svg.appendChild(svgEl('text', {
       x: LABEL_W - 38, y: y + GROUP_H / 2 + 5,
-      fill: '#6b7280', 'font-size': 13, cursor: 'pointer',
+      fill: getColor('--text-secondary'), 'font-size': 13, cursor: 'pointer',
       'text-anchor': 'middle',
       'data-action': 'edit-group', 'data-gid': g.id
     }, '\u270E\uFE0E'));
@@ -510,7 +514,7 @@ function renderGroup(svg, g, y, containerW) {
     // "+ task" button
     svg.appendChild(svgEl('text', {
       x: LABEL_W - 28, y: y + GROUP_H / 2 + 5,
-      fill: '#9ca3af', 'font-size': 14, cursor: 'pointer',
+      fill: getColor('--text-muted'), 'font-size': 14, cursor: 'pointer',
       'text-anchor': 'middle',
       'data-action': 'add-task', 'data-gid': g.id
     }, '+'));
@@ -546,20 +550,20 @@ function renderGroup(svg, g, y, containerW) {
 }
 
 function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
-  svg.appendChild(svgEl('rect', { x: 0, y, width: containerW, height: TASK_H, fill: '#fafafa' }));
-  svg.appendChild(svgEl('line', { x1: 0, y1: y + TASK_H, x2: containerW, y2: y + TASK_H, stroke: '#f0f0f0', 'stroke-width': 1 }));
+  svg.appendChild(svgEl('rect', { x: 0, y, width: containerW, height: TASK_H, fill: getColor('--bg-alt') }));
+  svg.appendChild(svgEl('line', { x1: 0, y1: y + TASK_H, x2: containerW, y2: y + TASK_H, stroke: getColor('--row-divider'), 'stroke-width': 1 }));
 
   // Drag handle ≡ for task reorder
   svg.appendChild(svgEl('text', {
     x: 6, y: y + TASK_H / 2 + 4,
-    fill: '#d1d5db', 'font-size': 10, 'text-anchor': 'middle', cursor: 'grab',
+    fill: getColor('--text-muted2'), 'font-size': 10, 'text-anchor': 'middle', cursor: 'grab',
     'data-action': 'reorder-task', 'data-tid': t.id, 'data-gid': g.id,
   }, '\u2630'));
 
   // Task name label (left panel)
   svg.appendChild(svgEl('text', {
     x: 16, y: y + TASK_H / 2 + 4,
-    fill: '#374151', 'font-size': 12, cursor: 'pointer',
+    fill: getColor('--text-strong'), 'font-size': 12, cursor: 'pointer',
     'data-action': 'edit-task', 'data-tid': t.id
   }, truncate(t.name, 26)));
 
@@ -584,7 +588,7 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
     barPos[t.id] = { x: cx, y: cy - R, w: 0, h: R * 2, midY: cy };
     svg.appendChild(svgEl('text', {
       x: cx + R + 6, y: cy + 4,
-      fill: '#374151', 'font-size': 12, 'font-weight': '500',
+      fill: getColor('--text-strong'), 'font-size': 12, 'font-weight': '500',
       'pointer-events': 'none'
     }, truncate(t.name, 28)));
     return;
@@ -1594,7 +1598,7 @@ document.getElementById('btn-zoom-out').addEventListener('click', () => applyZoo
 document.getElementById('btn-today').addEventListener('click', scrollToToday);
 document.getElementById('btn-undo').addEventListener('click', undo);
 document.getElementById('btn-redo').addEventListener('click', redo);
-document.getElementById('btn-new').addEventListener('click', () => { if (isReadOnly) return; startFresh(); });
+document.getElementById('btn-new').addEventListener('click', startFresh);
 document.getElementById('btn-get-started').addEventListener('click', showOnboarding);
 document.getElementById('template-picker-cancel').addEventListener('click', hideTemplatePicker);
 document.getElementById('template-picker-backdrop').addEventListener('click', hideTemplatePicker);
@@ -1807,12 +1811,46 @@ function showOnboarding() {
 function startFresh() {
   if (state && !confirm('Start fresh? Your current roadmap will be cleared from this browser.')) return;
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem('roadmap_readonly_v1');
+  localStorage.removeItem('roadmap_url_state_v1');
+  localStorage.removeItem('roadmap_source_url_v1');
+  isReadOnly = false;
+  isFromUrl = false;
+  urlState = null;
+  sourceUrl = null;
   state = null;
   undoStack.length = 0;
   redoStack.length = 0;
   render();
   showOnboarding();
 }
+
+// ============================================================
+// Theme
+// ============================================================
+const THEME_KEY = 'roadmap_theme_v1';
+
+function applyTheme(dark) {
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+}
+
+function loadTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved) {
+    applyTheme(saved === 'dark');
+  } else {
+    applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+}
+
+loadTheme();
+
+document.getElementById('btn-theme').addEventListener('click', () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  applyTheme(!isDark);
+  render();
+});
 
 // ============================================================
 // Bootstrap
