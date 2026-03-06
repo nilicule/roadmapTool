@@ -16,4 +16,4 @@ app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 def run():
     reload = os.environ.get("RELOAD", "").lower() in ("1", "true", "yes")
-    uvicorn.run("roadmaptool.main:app", host="0.0.0.0", port=8000, reload=reload)
+    uvicorn.run("roadmaptool.main:app", host="0.0.0.0", port=5006, reload=reload)
