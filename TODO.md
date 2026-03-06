@@ -42,4 +42,3 @@
 ## Multi-file / Project Management
 
 - [ ] Multiple roadmap files — currently hardcoded to a single `roadmap.yaml`; support named files or a project switcher backed by the local filesystem
-- [ ] Roadmap templates — start from a pre-built template (e.g. "Software Launch", "Quarterly Planning") rather than from scratch
