@@ -17,6 +17,16 @@
           <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
         </svg>
       </button>
+      <button id="btn-swimlane" class="btn btn--icon" title="Group by assignee">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+          <circle cx="7" cy="6" r="2" fill="currentColor"/>
+          <circle cx="14" cy="12" r="2" fill="currentColor"/>
+          <circle cx="9" cy="18" r="2" fill="currentColor"/>
+        </svg>
+      </button>
 <button id="btn-import" class="btn btn--icon" title="Import YAML">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -54,6 +64,18 @@
   </header>
 
   <div class="legend" id="legend"></div>
+
+  <div id="filter-bar" class="filter-bar hidden">
+    <select id="filter-assignee" class="filter-select">
+      <option value="">All assignees</option>
+    </select>
+    <select id="filter-tag" class="filter-select">
+      <option value="">All tags</option>
+    </select>
+    <button id="filter-overdue" class="btn btn--filter" title="Show overdue tasks only">Overdue</button>
+    <button id="filter-completed" class="btn btn--filter" title="Hide completed tasks">Hide done</button>
+    <button id="filter-clear" class="btn btn--filter-clear hidden">Clear filters</button>
+  </div>
 
   <div id="empty-state" class="hidden">
     <div class="empty-state__content">

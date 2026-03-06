@@ -31,6 +31,9 @@ let reorderIndicator = null; // <line> shown during group/task reorder drag
 let _hoverTid = null;
 let _hidePopupTimer = null;
 let selectedTid = null;
+let filterState = { assignee: '', tag: '', overdueOnly: false, hideCompleted: false };
+let swimlaneMode = false;
+let swimlaneCollapsed = new Set();
 
 // ============================================================
 // Date utilities
@@ -58,6 +61,50 @@ function tagColor(tag) {
 }
 function isOverdue(t) {
   return parseDate(t.end) < today() && (t.progress ?? 0) < 100;
+}
+
+function getAssignees() {
+  return [...new Set(state.groups.flatMap(g => g.tasks.map(t => t.assignee).filter(Boolean)))].sort();
+}
+
+function getTags() {
+  return [...new Set(state.groups.flatMap(g => g.tasks.flatMap(t => t.tags)))].sort();
+}
+
+function isTaskVisible(t) {
+  if (filterState.hideCompleted && (t.progress ?? 0) >= 100) return false;
+  if (filterState.overdueOnly && !isOverdue(t)) return false;
+  if (filterState.assignee && t.assignee !== filterState.assignee) return false;
+  if (filterState.tag && !t.tags.includes(filterState.tag)) return false;
+  return true;
+}
+
+function assigneeColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return `hsl(${h}, 50%, 45%)`;
+}
+
+function buildSwimlaneGroups() {
+  const map = new Map();
+  for (const g of state.groups) {
+    for (const t of g.tasks) {
+      if (!isTaskVisible(t)) continue;
+      const key = t.assignee || '';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(t);
+    }
+  }
+  const result = [];
+  if (map.has('')) {
+    const id = '__unassigned__';
+    result.push({ id, name: 'Unassigned', color: '#9ca3af', collapsed: swimlaneCollapsed.has(id), tasks: map.get(''), depends_on: [] });
+  }
+  for (const [key, tasks] of [...map.entries()].filter(([k]) => k).sort()) {
+    const id = `__swimlane_${key}__`;
+    result.push({ id, name: key, color: assigneeColor(key), collapsed: swimlaneCollapsed.has(id), tasks, depends_on: [] });
+  }
+  return result;
 }
 
 // ============================================================
@@ -133,7 +180,32 @@ function render() {
   if (!state) return;
   document.getElementById('roadmap-title').textContent = state.title;
   renderLegend();
+  renderFilterBar();
   renderSVG();
+}
+
+function renderFilterBar() {
+  const bar = document.getElementById('filter-bar');
+  bar.classList.toggle('hidden', !state);
+  if (!state) return;
+
+  const assignees = getAssignees();
+  const tags = getTags();
+
+  const assigneeSelect = document.getElementById('filter-assignee');
+  assigneeSelect.innerHTML = '<option value="">All assignees</option>' +
+    assignees.map(a => `<option value="${a}"${a === filterState.assignee ? ' selected' : ''}>${a}</option>`).join('');
+
+  const tagSelect = document.getElementById('filter-tag');
+  tagSelect.innerHTML = '<option value="">All tags</option>' +
+    tags.map(t => `<option value="${t}"${t === filterState.tag ? ' selected' : ''}>${t}</option>`).join('');
+
+  document.getElementById('filter-overdue').classList.toggle('active', filterState.overdueOnly);
+  document.getElementById('filter-completed').classList.toggle('active', filterState.hideCompleted);
+
+  const hasFilter = filterState.assignee || filterState.tag || filterState.overdueOnly || filterState.hideCompleted;
+  document.getElementById('filter-clear').classList.toggle('hidden', !hasFilter);
+  document.getElementById('btn-swimlane').classList.toggle('active', swimlaneMode);
 }
 
 function renderLegend() {
@@ -160,12 +232,16 @@ function renderSVG() {
   const svgW = LABEL_W + totalDays * dayW;
 
   // Compute total height
+  const groups = swimlaneMode ? buildSwimlaneGroups() : state.groups;
   let totalH = HEADER_H;
-  for (const g of state.groups) {
+  for (const g of groups) {
     totalH += GROUP_H;
-    if (!g.collapsed) totalH += g.tasks.length * TASK_H;
+    if (!g.collapsed) {
+      const visibleTasks = swimlaneMode ? g.tasks : g.tasks.filter(isTaskVisible);
+      totalH += visibleTasks.length * TASK_H;
+    }
   }
-  totalH += GROUP_H + 10; // "+ Add group" row
+  if (!swimlaneMode) totalH += GROUP_H + 10; // "+ Add group" row
 
   svg.setAttribute('width', svgW);
   svg.setAttribute('height', totalH);
@@ -191,27 +267,30 @@ function renderSVG() {
     }));
   }
 
-  // "+ Add group" row (top of label column)
+  // "+ Add group" row (top of label column, only in normal mode)
   let y = HEADER_H;
-  svg.appendChild(svgEl('rect', { x: 0, y, width: LABEL_W, height: GROUP_H, fill: '#fafafa' }));
-  svg.appendChild(svgEl('line', { x1: 0, y1: y, x2: LABEL_W, y2: y, stroke: '#e0e0e0', 'stroke-width': 1 }));
-  svg.appendChild(svgEl('text', {
-    x: 20, y: y + GROUP_H / 2 + 5,
-    fill: '#9ca3af', 'font-size': 13, cursor: 'pointer',
-    'data-action': 'add-group',
-  }, '+ Add group'));
-  y += GROUP_H;
+  if (!swimlaneMode) {
+    svg.appendChild(svgEl('rect', { x: 0, y, width: LABEL_W, height: GROUP_H, fill: '#fafafa' }));
+    svg.appendChild(svgEl('line', { x1: 0, y1: y, x2: LABEL_W, y2: y, stroke: '#e0e0e0', 'stroke-width': 1 }));
+    svg.appendChild(svgEl('text', {
+      x: 20, y: y + GROUP_H / 2 + 5,
+      fill: '#9ca3af', 'font-size': 13, cursor: 'pointer',
+      'data-action': 'add-group',
+    }, '+ Add group'));
+    y += GROUP_H;
+  }
 
   // Groups and tasks
   barPos = {};
   groupYPos = [];
   taskYPos = [];
-  for (const g of state.groups) {
+  for (const g of groups) {
     const groupStartY = y;
     renderGroup(svg, g, y, svgW);
     y += GROUP_H;
     if (!g.collapsed) {
       for (const t of g.tasks) {
+        if (!swimlaneMode && !isTaskVisible(t)) continue;
         taskYPos.push({ tid: t.id, gid: g.id, y, h: TASK_H });
         renderTask(svg, t, g, y, timeStart, dayW, svgW);
         y += TASK_H;
@@ -272,8 +351,8 @@ function renderGroup(svg, g, y, containerW) {
   // Color indicator
   svg.appendChild(svgEl('rect', { x: 0, y, width: 4, height: GROUP_H, fill: g.color }));
 
-  // Drag handle ≡
-  svg.appendChild(svgEl('text', {
+  // Drag handle ≡ (hidden in swimlane mode)
+  if (!swimlaneMode) svg.appendChild(svgEl('text', {
     x: 8, y: y + GROUP_H / 2 + 5,
     fill: '#9ca3af', 'font-size': 12, 'text-anchor': 'middle', cursor: 'grab',
     'data-action': 'reorder-group', 'data-gid': g.id,
@@ -300,30 +379,32 @@ function renderGroup(svg, g, y, containerW) {
     'data-action': 'toggle-group', 'data-gid': g.id
   }, groupNameLabel));
 
-  // Edit button — \uFE0E forces text (not emoji) rendering of ✎
-  svg.appendChild(svgEl('text', {
-    x: LABEL_W - 38, y: y + GROUP_H / 2 + 5,
-    fill: '#6b7280', 'font-size': 13, cursor: 'pointer',
-    'text-anchor': 'middle',
-    'data-action': 'edit-group', 'data-gid': g.id
-  }, '\u270E\uFE0E'));
+  if (!swimlaneMode) {
+    // Edit button — \uFE0E forces text (not emoji) rendering of ✎
+    svg.appendChild(svgEl('text', {
+      x: LABEL_W - 38, y: y + GROUP_H / 2 + 5,
+      fill: '#6b7280', 'font-size': 13, cursor: 'pointer',
+      'text-anchor': 'middle',
+      'data-action': 'edit-group', 'data-gid': g.id
+    }, '\u270E\uFE0E'));
 
-  // "+ task" button
-  svg.appendChild(svgEl('text', {
-    x: LABEL_W - 28, y: y + GROUP_H / 2 + 5,
-    fill: '#9ca3af', 'font-size': 14, cursor: 'pointer',
-    'text-anchor': 'middle',
-    'data-action': 'add-task', 'data-gid': g.id
-  }, '+'));
+    // "+ task" button
+    svg.appendChild(svgEl('text', {
+      x: LABEL_W - 28, y: y + GROUP_H / 2 + 5,
+      fill: '#9ca3af', 'font-size': 14, cursor: 'pointer',
+      'text-anchor': 'middle',
+      'data-action': 'add-task', 'data-gid': g.id
+    }, '+'));
 
-  // "◇ milestone" button
-  svg.appendChild(svgEl('text', {
-    x: LABEL_W - 14, y: y + GROUP_H / 2 + 5,
-    'text-anchor': 'middle', fill: g.color, 'font-size': 14,
-    cursor: 'pointer', 'font-weight': 'bold',
-    'data-action': 'add-milestone', 'data-gid': g.id,
-    title: 'Add milestone'
-  }, '◇'));
+    // "◇ milestone" button
+    svg.appendChild(svgEl('text', {
+      x: LABEL_W - 14, y: y + GROUP_H / 2 + 5,
+      'text-anchor': 'middle', fill: g.color, 'font-size': 14,
+      cursor: 'pointer', 'font-weight': 'bold',
+      'data-action': 'add-milestone', 'data-gid': g.id,
+      title: 'Add milestone'
+    }, '◇'));
+  }
 
   // Summary bar (collapsed) + barPos for dependency arrows
   if (g.tasks.length > 0) {
@@ -903,8 +984,14 @@ svgEl_root.addEventListener('click', async (e) => {
     if (action === 'add-group') {
       openAddGroupModal();
     } else if (action === 'toggle-group') {
-      const g = state.groups.find(g => g.id === gid);
-      mutate(() => { g.collapsed = !g.collapsed; });
+      if (swimlaneMode) {
+        if (swimlaneCollapsed.has(gid)) swimlaneCollapsed.delete(gid);
+        else swimlaneCollapsed.add(gid);
+        render();
+      } else {
+        const g = state.groups.find(g => g.id === gid);
+        mutate(() => { g.collapsed = !g.collapsed; });
+      }
     } else if (action === 'edit-group') {
       openEditGroupModal(gid);
     } else if (action === 'add-task') {
@@ -1325,6 +1412,33 @@ document.getElementById('btn-undo').addEventListener('click', undo);
 document.getElementById('btn-redo').addEventListener('click', redo);
 document.getElementById('btn-new').addEventListener('click', startFresh);
 document.getElementById('btn-get-started').addEventListener('click', showOnboarding);
+
+document.getElementById('btn-swimlane').addEventListener('click', () => {
+  swimlaneMode = !swimlaneMode;
+  swimlaneCollapsed.clear();
+  render();
+});
+
+document.getElementById('filter-assignee').addEventListener('change', e => {
+  filterState.assignee = e.target.value;
+  render();
+});
+document.getElementById('filter-tag').addEventListener('change', e => {
+  filterState.tag = e.target.value;
+  render();
+});
+document.getElementById('filter-overdue').addEventListener('click', () => {
+  filterState.overdueOnly = !filterState.overdueOnly;
+  render();
+});
+document.getElementById('filter-completed').addEventListener('click', () => {
+  filterState.hideCompleted = !filterState.hideCompleted;
+  render();
+});
+document.getElementById('filter-clear').addEventListener('click', () => {
+  filterState = { assignee: '', tag: '', overdueOnly: false, hideCompleted: false };
+  render();
+});
 
 document.getElementById('btn-import').addEventListener('click', () => {
   openModal('Import YAML', [
