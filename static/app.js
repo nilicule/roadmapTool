@@ -1351,6 +1351,14 @@ function updateReadOnlyUI() {
   }
 }
 
+document.getElementById('readonly-badge').addEventListener('click', () => {
+  isReadOnly = false;
+  isFromUrl = false;
+  localStorage.removeItem('roadmap_readonly_v1');
+  updateReadOnlyUI();
+  render();
+});
+
 document.getElementById('title-source-link').addEventListener('click', (e) => {
   if (!urlState || !state) return;
   const isDifferent = JSON.stringify(state) !== JSON.stringify(urlState);
