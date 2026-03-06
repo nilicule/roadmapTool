@@ -169,3 +169,28 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 .btn--filter-clear:hover { background: #fee2e2; }
 .btn--filter-clear.hidden { display: none; }
+
+.template-picker {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.template-picker.hidden { display: none; }
+.template-picker__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.4); }
+.template-picker__panel {
+  position: relative; background: #fff; border-radius: 12px;
+  padding: 28px; width: 660px; max-width: calc(100vw - 40px);
+  max-height: 85vh; overflow-y: auto;
+}
+.template-picker__title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #111827; }
+.template-picker__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+.template-card {
+  border: 2px solid #e5e7eb; border-radius: 8px; padding: 16px 18px;
+  cursor: pointer; text-align: left; background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.template-card:hover { border-color: #2563eb; box-shadow: 0 2px 8px rgba(37,99,235,0.12); }
+.template-card__icon { font-size: 22px; margin-bottom: 8px; }
+.template-card__name { font-weight: 600; font-size: 14px; color: #111827; margin-bottom: 4px; }
+.template-card__desc { font-size: 13px; color: #6b7280; line-height: 1.45; }
+.template-card--blank { border-style: dashed; }

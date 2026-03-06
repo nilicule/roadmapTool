@@ -14,6 +14,96 @@ const ZOOM_LEVELS = [
   { label: 'Week',    days: 7   },
 ];
 
+const TEMPLATES = [
+  {
+    id: 'software-launch',
+    name: 'Software Launch',
+    icon: '🚀',
+    description: '5-phase product launch: discovery, design, dev, QA, and release.',
+    defaultTitle: 'Product Launch',
+    durationWeeks: 16,
+    groups: [
+      { name: 'Discovery', color: '#8b5cf6', tasks: [
+        { name: 'User research', startWeek: 0, endWeek: 2 },
+        { name: 'Competitor analysis', startWeek: 0, endWeek: 2 },
+        { name: 'Requirements doc', startWeek: 2, endWeek: 4 },
+      ]},
+      { name: 'Design', color: '#ec4899', tasks: [
+        { name: 'Wireframes', startWeek: 3, endWeek: 5 },
+        { name: 'UI design', startWeek: 5, endWeek: 7 },
+        { name: 'Design review', startWeek: 7, endWeek: 8 },
+      ]},
+      { name: 'Development', color: '#2563eb', tasks: [
+        { name: 'Backend API', startWeek: 7, endWeek: 12 },
+        { name: 'Frontend', startWeek: 8, endWeek: 13 },
+        { name: 'Integration', startWeek: 12, endWeek: 14 },
+      ]},
+      { name: 'QA & Testing', color: '#f59e0b', tasks: [
+        { name: 'Test plan', startWeek: 12, endWeek: 13 },
+        { name: 'QA testing', startWeek: 13, endWeek: 15 },
+        { name: 'Bug fixes', startWeek: 14, endWeek: 16 },
+      ]},
+      { name: 'Launch', color: '#16a34a', tasks: [
+        { name: 'Staging deploy', startWeek: 15, endWeek: 16 },
+        { name: 'Production release', startWeek: 16, endWeek: 16 },
+      ]},
+    ],
+  },
+  {
+    id: 'quarterly-planning',
+    name: 'Quarterly Planning',
+    icon: '📊',
+    description: 'Three-phase quarter: planning sprint, execution, and retrospective.',
+    defaultTitle: 'Q1 Roadmap',
+    durationWeeks: 13,
+    groups: [
+      { name: 'Planning', color: '#6366f1', tasks: [
+        { name: 'OKR setting', startWeek: 0, endWeek: 1 },
+        { name: 'Backlog grooming', startWeek: 0, endWeek: 2 },
+        { name: 'Sprint planning', startWeek: 1, endWeek: 2 },
+      ]},
+      { name: 'Execution', color: '#2563eb', tasks: [
+        { name: 'Sprint 1', startWeek: 2, endWeek: 5 },
+        { name: 'Sprint 2', startWeek: 5, endWeek: 8 },
+        { name: 'Sprint 3', startWeek: 8, endWeek: 11 },
+      ]},
+      { name: 'Review', color: '#16a34a', tasks: [
+        { name: 'Demo & review', startWeek: 11, endWeek: 12 },
+        { name: 'Retrospective', startWeek: 12, endWeek: 13 },
+      ]},
+    ],
+  },
+  {
+    id: 'marketing-campaign',
+    name: 'Marketing Campaign',
+    icon: '📣',
+    description: 'End-to-end campaign: research, creative, launch, and analysis.',
+    defaultTitle: 'Campaign Roadmap',
+    durationWeeks: 10,
+    groups: [
+      { name: 'Research', color: '#8b5cf6', tasks: [
+        { name: 'Audience research', startWeek: 0, endWeek: 2 },
+        { name: 'Competitive audit', startWeek: 0, endWeek: 2 },
+        { name: 'Brief & strategy', startWeek: 2, endWeek: 3 },
+      ]},
+      { name: 'Creative', color: '#ec4899', tasks: [
+        { name: 'Copywriting', startWeek: 3, endWeek: 5 },
+        { name: 'Visual assets', startWeek: 3, endWeek: 6 },
+        { name: 'Creative review', startWeek: 6, endWeek: 7 },
+      ]},
+      { name: 'Launch', color: '#f59e0b', tasks: [
+        { name: 'Channel setup', startWeek: 6, endWeek: 7 },
+        { name: 'Campaign goes live', startWeek: 7, endWeek: 7 },
+        { name: 'Paid media run', startWeek: 7, endWeek: 9 },
+      ]},
+      { name: 'Analysis', color: '#16a34a', tasks: [
+        { name: 'Performance report', startWeek: 9, endWeek: 10 },
+        { name: 'Learnings & recommendations', startWeek: 10, endWeek: 10 },
+      ]},
+    ],
+  },
+];
+
 // ============================================================
 // State
 // ============================================================
@@ -1412,6 +1502,8 @@ document.getElementById('btn-undo').addEventListener('click', undo);
 document.getElementById('btn-redo').addEventListener('click', redo);
 document.getElementById('btn-new').addEventListener('click', startFresh);
 document.getElementById('btn-get-started').addEventListener('click', showOnboarding);
+document.getElementById('template-picker-cancel').addEventListener('click', hideTemplatePicker);
+document.getElementById('template-picker-backdrop').addEventListener('click', hideTemplatePicker);
 
 document.getElementById('btn-swimlane').addEventListener('click', () => {
   swimlaneMode = !swimlaneMode;
@@ -1525,25 +1617,82 @@ document.getElementById('btn-export').addEventListener('click', async () => {
 // ============================================================
 // Onboarding
 // ============================================================
-function showOnboarding() {
+function showTemplatePicker() {
+  const grid = document.getElementById('template-grid');
+  grid.innerHTML = '';
+
+  const blankCard = document.createElement('button');
+  blankCard.type = 'button';
+  blankCard.className = 'template-card template-card--blank';
+  blankCard.innerHTML = `
+    <div class="template-card__icon">📄</div>
+    <div class="template-card__name">Blank roadmap</div>
+    <div class="template-card__desc">Start with an empty canvas and build from scratch.</div>
+  `;
+  blankCard.addEventListener('click', () => openOnboardingForm(null));
+  grid.appendChild(blankCard);
+
+  for (const tpl of TEMPLATES) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'template-card';
+    card.innerHTML = `
+      <div class="template-card__icon">${tpl.icon}</div>
+      <div class="template-card__name">${tpl.name}</div>
+      <div class="template-card__desc">${tpl.description}</div>
+    `;
+    card.addEventListener('click', () => openOnboardingForm(tpl));
+    grid.appendChild(card);
+  }
+
+  document.getElementById('template-picker').classList.remove('hidden');
+}
+
+function hideTemplatePicker() {
+  document.getElementById('template-picker').classList.add('hidden');
+}
+
+function openOnboardingForm(template) {
+  hideTemplatePicker();
   const yr = new Date().getFullYear();
+  const defaultEnd = template
+    ? shiftDate(`${yr}-01-01`, template.durationWeeks * 7)
+    : `${yr}-12-31`;
   openModal('Set up your roadmap', [
-    { name: 'title', label: 'Roadmap name', placeholder: 'e.g. Product Roadmap 2026' },
+    { name: 'title', label: 'Roadmap name', value: template?.defaultTitle ?? '', placeholder: 'e.g. Product Roadmap 2026' },
     { name: 'start', label: 'Start date', type: 'date', value: `${yr}-01-01` },
-    { name: 'end',   label: 'End date',   type: 'date', value: `${yr}-12-31` },
+    { name: 'end',   label: 'End date',   type: 'date', value: defaultEnd },
   ], (data) => {
-    state = {
-      title: data.title || 'My Roadmap',
-      start: normalizeDate(data.start),
-      end:   normalizeDate(data.end, true),
-      groups: [],
-    };
+    const startDate = normalizeDate(data.start);
+    const endDate   = normalizeDate(data.end, true);
+    state = buildStateFromTemplate(template, data.title || 'My Roadmap', startDate, endDate);
     undoStack.length = 0;
     redoStack.length = 0;
     saveState();
     render();
     scrollToToday();
   });
+}
+
+function buildStateFromTemplate(template, title, startDate, endDate) {
+  if (!template) return { title, start: startDate, end: endDate, groups: [] };
+  return {
+    title, start: startDate, end: endDate,
+    groups: template.groups.map(g => ({
+      id: _slug(g.name), name: g.name, color: g.color, collapsed: false, depends_on: [],
+      tasks: g.tasks.map(t => {
+        const s = shiftDate(startDate, t.startWeek * 7);
+        const e = t.startWeek === t.endWeek
+          ? s
+          : shiftDate(startDate, t.endWeek * 7 - 1);
+        return { id: _slug(t.name), name: t.name, start: s, end: e, assignee: null, progress: null, tags: [], depends_on: [] };
+      }),
+    })),
+  };
+}
+
+function showOnboarding() {
+  showTemplatePicker();
 }
 
 function startFresh() {

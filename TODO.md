@@ -21,16 +21,11 @@
 
 ## Filtering & Search
 
-- [ ] Filter by assignee — toolbar dropdown to show only tasks belonging to one person; unmatched tasks dimmed or hidden
-- [ ] Filter by tag — same pattern; clicking a tag pill in the legend or toolbar filters to tasks carrying that tag
 - [ ] Search tasks by name — text input that highlights or isolates matching tasks as you type
-- [ ] Hide completed tasks — toggle to suppress tasks with progress = 100 (useful when a roadmap is long-running)
-- [ ] Filter overdue tasks — one-click view of tasks past their end date with < 100% progress
 
 ## Alternative Views
 
 - [ ] List / table view — spreadsheet-style view of all tasks (name, group, assignee, dates, progress, tags) as an alternative to the Gantt; useful for bulk reviewing
-- [ ] By-assignee swimlane — collapse tasks into rows per person instead of per group, so workload is immediately visible
 - [ ] Critical path highlighting — colour the chain of tasks that determines the earliest possible finish date
 
 ## Workload & Reporting
