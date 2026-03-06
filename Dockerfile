@@ -11,9 +11,8 @@ RUN uv sync --frozen --no-dev
 # Copy application
 COPY src/ src/
 COPY static/ static/
-COPY roadmap.yaml ./
 
-EXPOSE 8000
+EXPOSE 5006
 
 # Mount your roadmap.yaml over /app/roadmap.yaml to persist data:
 #   docker run -v /host/path/roadmap.yaml:/app/roadmap.yaml ...
