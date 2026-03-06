@@ -138,6 +138,10 @@ let swimlaneCollapsed = new Set();
 // Date utilities
 // ============================================================
 function parseDate(s) { return new Date(s + 'T00:00:00'); }
+function formatDateRange(start, end) {
+  const fmt = s => parseDate(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return start === end ? fmt(start) : `${fmt(start)} – ${fmt(end)}`;
+}
 function daysDiff(a, b) { return Math.round((b - a) / 86400000); }
 function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
 // Expand "MM/YYYY" shorthand to a full YYYY-MM-DD date.
@@ -1121,6 +1125,10 @@ function showTaskPopup(tid) {
 
   // Name
   document.getElementById('task-popup-name').textContent = task.name;
+
+  // Dates
+  const datesEl = document.getElementById('task-popup-dates');
+  datesEl.textContent = formatDateRange(task.start, task.end);
 
   // Tags
   const tagsEl = document.getElementById('task-popup-tags');
