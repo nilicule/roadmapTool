@@ -50,26 +50,35 @@ const TEMPLATES = [
     ],
   },
   {
-    id: 'quarterly-planning',
-    name: 'Quarterly Planning',
-    icon: '📊',
-    description: 'Three-phase quarter: planning sprint, execution, and retrospective.',
-    defaultTitle: 'Q1 Roadmap',
-    durationWeeks: 13,
+    id: 'security-roadmap',
+    name: 'Security Roadmap',
+    icon: '🔒',
+    description: 'Assess, remediate, and harden: vulnerability management through to compliance.',
+    defaultTitle: 'Security Roadmap',
+    durationWeeks: 24,
     groups: [
-      { name: 'Planning', color: '#6366f1', tasks: [
-        { name: 'OKR setting', startWeek: 0, endWeek: 1 },
-        { name: 'Backlog grooming', startWeek: 0, endWeek: 2 },
-        { name: 'Sprint planning', startWeek: 1, endWeek: 2 },
+      { name: 'Assessment', color: '#dc2626', tasks: [
+        { name: 'Asset inventory', startWeek: 0, endWeek: 2 },
+        { name: 'Threat modelling', startWeek: 1, endWeek: 3 },
+        { name: 'Penetration test', startWeek: 2, endWeek: 5 },
+        { name: 'Risk register', startWeek: 4, endWeek: 6 },
       ]},
-      { name: 'Execution', color: '#2563eb', tasks: [
-        { name: 'Sprint 1', startWeek: 2, endWeek: 5 },
-        { name: 'Sprint 2', startWeek: 5, endWeek: 8 },
-        { name: 'Sprint 3', startWeek: 8, endWeek: 11 },
+      { name: 'Remediation', color: '#f59e0b', tasks: [
+        { name: 'Patch critical CVEs', startWeek: 5, endWeek: 8 },
+        { name: 'Secrets rotation', startWeek: 6, endWeek: 8 },
+        { name: 'Fix high-severity findings', startWeek: 7, endWeek: 12 },
       ]},
-      { name: 'Review', color: '#16a34a', tasks: [
-        { name: 'Demo & review', startWeek: 11, endWeek: 12 },
-        { name: 'Retrospective', startWeek: 12, endWeek: 13 },
+      { name: 'Hardening', color: '#2563eb', tasks: [
+        { name: 'MFA rollout', startWeek: 8, endWeek: 10 },
+        { name: 'Network segmentation', startWeek: 9, endWeek: 14 },
+        { name: 'SIEM / logging setup', startWeek: 10, endWeek: 14 },
+        { name: 'Endpoint protection', startWeek: 12, endWeek: 16 },
+      ]},
+      { name: 'Compliance', color: '#16a34a', tasks: [
+        { name: 'Policy & procedure docs', startWeek: 14, endWeek: 18 },
+        { name: 'Security training', startWeek: 16, endWeek: 20 },
+        { name: 'Audit preparation', startWeek: 18, endWeek: 22 },
+        { name: 'Certification audit', startWeek: 22, endWeek: 24 },
       ]},
     ],
   },
