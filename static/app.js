@@ -129,6 +129,7 @@ function svgEl(tag, attrs = {}, text = null) {
 // Rendering
 // ============================================================
 function render() {
+  document.getElementById('empty-state').classList.toggle('hidden', !!state);
   if (!state) return;
   document.getElementById('roadmap-title').textContent = state.title;
   renderLegend();
@@ -1322,6 +1323,8 @@ document.getElementById('btn-zoom-out').addEventListener('click', () => applyZoo
 document.getElementById('btn-today').addEventListener('click', scrollToToday);
 document.getElementById('btn-undo').addEventListener('click', undo);
 document.getElementById('btn-redo').addEventListener('click', redo);
+document.getElementById('btn-new').addEventListener('click', startFresh);
+document.getElementById('btn-get-started').addEventListener('click', showOnboarding);
 
 document.getElementById('btn-import').addEventListener('click', () => {
   openModal('Import YAML', [
@@ -1406,6 +1409,40 @@ document.getElementById('btn-export').addEventListener('click', async () => {
 });
 
 // ============================================================
+// Onboarding
+// ============================================================
+function showOnboarding() {
+  const yr = new Date().getFullYear();
+  openModal('Set up your roadmap', [
+    { name: 'title', label: 'Roadmap name', placeholder: 'e.g. Product Roadmap 2026' },
+    { name: 'start', label: 'Start date', type: 'date', value: `${yr}-01-01` },
+    { name: 'end',   label: 'End date',   type: 'date', value: `${yr}-12-31` },
+  ], (data) => {
+    state = {
+      title: data.title || 'My Roadmap',
+      start: normalizeDate(data.start),
+      end:   normalizeDate(data.end, true),
+      groups: [],
+    };
+    undoStack.length = 0;
+    redoStack.length = 0;
+    saveState();
+    render();
+    scrollToToday();
+  });
+}
+
+function startFresh() {
+  if (state && !confirm('Start fresh? Your current roadmap will be cleared from this browser.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = null;
+  undoStack.length = 0;
+  redoStack.length = 0;
+  render();
+  showOnboarding();
+}
+
+// ============================================================
 // Bootstrap
 // ============================================================
 async function bootstrap() {
@@ -1428,5 +1465,6 @@ async function bootstrap() {
     }
   }
   await loadRoadmap();
+  if (!state) showOnboarding();
 }
 bootstrap();

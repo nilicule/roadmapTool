@@ -1,44 +1,50 @@
 # TODO
 
-## Completed (v1)
+## UX / Interactions
 
-- [x] FastAPI backend serving single-page app
-- [x] YAML storage with ruamel.yaml, Pydantic v2 validation
-- [x] SVG Gantt timeline: month headers, today marker, group rows, task bars
-- [x] Collapsible groups
-- [x] Add / edit / delete groups and tasks via modal UI
-- [x] Reorder groups API
-- [x] Export roadmap.yaml download
-- [x] Error toasts on API failures
-- [x] Full test suite (18 tests)
+- [ ] `Delete`/`Backspace` key shortcut to delete the selected task
+- [ ] Duplicate/copy task — no way to clone an existing task from the UI
+- [ ] Collapse all / Expand all button for groups
+- [ ] Cross-group task move — drag a task row into a different group (currently same-group only)
+- [ ] Show start/end dates in the task hover popup (only name, assignee, and tags are shown today)
 
-## Post-MVP
+## Data model
 
-### Interactions
-- [x] Drag task bars to move dates
-- [x] Drag bar edges to resize (change start/end)
-- [x] Drag groups to reorder (replace reorder API with drag-and-drop)
-- [x] Undo / redo
+- [ ] Task notes/description field — free-text per task; not in model or UI
+- [ ] Multiple dependencies per task — the model already stores `depends_on: list[str]` but the edit modal only exposes a single `<select>`; needs a multi-select or tag-input widget
 
-### View
-- [x] Zoom levels (week / month / quarter / year)
-- [x] Scroll to / jump-to-today button or auto-scroll on load — today marker line exists but may be off-screen; need a way to navigate to it
-- [x] Task dependency arrows between bars
-- [x] Collapsed group summary bar (thin bar shown when group is collapsed)
-- [x] Milestone markers (diamond shape, zero-duration tasks)
+## Toolbar / Roadmap management
 
-### Data
-- [x] Import from clipboard or URL
-- [x] Task progress percentage (partially filled bar; group shows aggregate progress)
-- [x] Load roadmap from remote YAML URL via `?url=` query string — on page load, if `?url=<remote>` is present, fetch and import that YAML automatically
-- [x] Task assignees / owners
+- [ ] Roadmap date range editing from the UI — `PUT /roadmap` exists but there is no button/modal to change the global start/end dates or title
 
-### Bugs
-- [x] Dependency arrows not visible when source or target group is collapsed — when a group collapses, its tasks lose their `barPos` entries; arrows to/from those tasks disappear
-- [x] Color picker in Add/Edit Group modal shows no preview of the selected color (input renders as blank/grey bar; color is picked but not visually reflected in the field)
-- [x] "+" add task button sits on the bottom border of the group header row, overlapping with the first task row below it — needs to be vertically centered within the group header
+---
 
-### UX
-- [ ] Keyboard shortcuts (n = new task, e = edit selected, del = delete)
-- [ ] Search / filter tasks by name
-- [x] Export to PNG
+## Filtering & Search
+
+- [ ] Filter by assignee — toolbar dropdown to show only tasks belonging to one person; unmatched tasks dimmed or hidden
+- [ ] Filter by tag — same pattern; clicking a tag pill in the legend or toolbar filters to tasks carrying that tag
+- [ ] Search tasks by name — text input that highlights or isolates matching tasks as you type
+- [ ] Hide completed tasks — toggle to suppress tasks with progress = 100 (useful when a roadmap is long-running)
+- [ ] Filter overdue tasks — one-click view of tasks past their end date with < 100% progress
+
+## Alternative Views
+
+- [ ] List / table view — spreadsheet-style view of all tasks (name, group, assignee, dates, progress, tags) as an alternative to the Gantt; useful for bulk reviewing
+- [ ] By-assignee swimlane — collapse tasks into rows per person instead of per group, so workload is immediately visible
+- [ ] Critical path highlighting — colour the chain of tasks that determines the earliest possible finish date
+
+## Workload & Reporting
+
+- [ ] Workload summary panel — per-assignee count of tasks and aggregate % complete; answers "who is overloaded?"
+- [ ] Summary stats bar — headline numbers: total tasks, % complete, overdue count, days until end
+- [ ] Milestone list — dedicated sidebar or panel listing all milestones in date order with their status
+
+## Export
+
+- [ ] CSV / spreadsheet export — flat table of tasks for stakeholders who don't use YAML
+- [ ] PDF export — single-page landscape print-friendly output (SVG → PDF via browser print)
+
+## Multi-file / Project Management
+
+- [ ] Multiple roadmap files — currently hardcoded to a single `roadmap.yaml`; support named files or a project switcher backed by the local filesystem
+- [ ] Roadmap templates — start from a pre-built template (e.g. "Software Launch", "Quarterly Planning") rather than from scratch
