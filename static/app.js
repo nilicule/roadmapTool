@@ -26,7 +26,8 @@ let dayW = 0;         // pixels per day (module-level, set in renderSVG)
 let timeStart = null; // Date object (module-level, set in renderSVG)
 let barPos = {};      // tid/gid → { x, y, w, h, midY } for dependency arrows
 let groupYPos = [];   // [{gid, y, h}] for drag-to-reorder
-let reorderIndicator = null; // <line> shown during group reorder drag
+let taskYPos = [];    // [{tid, gid, y, h}] for task reorder drag hit detection
+let reorderIndicator = null; // <line> shown during group/task reorder drag
 let _hoverTid = null;
 let _hidePopupTimer = null;
 let selectedTid = null;
@@ -183,12 +184,14 @@ function renderSVG() {
   // Groups and tasks
   barPos = {};
   groupYPos = [];
+  taskYPos = [];
   for (const g of state.groups) {
     const groupStartY = y;
     renderGroup(svg, g, y, svgW);
     y += GROUP_H;
     if (!g.collapsed) {
       for (const t of g.tasks) {
+        taskYPos.push({ tid: t.id, gid: g.id, y, h: TASK_H });
         renderTask(svg, t, g, y, timeStart, dayW, svgW);
         y += TASK_H;
       }
@@ -325,12 +328,19 @@ function renderTask(svg, t, g, y, timeStart, dayW, containerW) {
   svg.appendChild(svgEl('rect', { x: 0, y, width: containerW, height: TASK_H, fill: '#fafafa' }));
   svg.appendChild(svgEl('line', { x1: 0, y1: y + TASK_H, x2: containerW, y2: y + TASK_H, stroke: '#f0f0f0', 'stroke-width': 1 }));
 
+  // Drag handle ≡ for task reorder
+  svg.appendChild(svgEl('text', {
+    x: 6, y: y + TASK_H / 2 + 4,
+    fill: '#d1d5db', 'font-size': 10, 'text-anchor': 'middle', cursor: 'grab',
+    'data-action': 'reorder-task', 'data-tid': t.id, 'data-gid': g.id,
+  }, '\u2630'));
+
   // Task name label (left panel)
   svg.appendChild(svgEl('text', {
-    x: 12, y: y + TASK_H / 2 + 4,
+    x: 16, y: y + TASK_H / 2 + 4,
     fill: '#374151', 'font-size': 12, cursor: 'pointer',
     'data-action': 'edit-task', 'data-tid': t.id
-  }, truncate(t.name, 28)));
+  }, truncate(t.name, 26)));
 
   const isMilestone = t.start === t.end;
 
@@ -655,6 +665,21 @@ svgEl_root.addEventListener('pointerdown', (e) => {
     };
     svgEl_root.setPointerCapture(e.pointerId);
     e.preventDefault();
+  } else if (el.dataset.action === 'reorder-task') {
+    const group = state.groups.find(g => g.id === el.dataset.gid);
+    if (!group) return;
+    const origIndex = group.tasks.findIndex(t => t.id === el.dataset.tid);
+    dragState = {
+      type: 'reorder-task',
+      tid: el.dataset.tid,
+      gid: el.dataset.gid,
+      startY: e.clientY,
+      origIndex,
+      currentIndex: origIndex,
+      hasMoved: false,
+    };
+    svgEl_root.setPointerCapture(e.pointerId);
+    e.preventDefault();
   } else if (el.dataset.action === 'resize-task') {
     const task = findTask(el.dataset.tid);
     if (!task) return;
@@ -715,6 +740,38 @@ svgEl_root.addEventListener('pointermove', (e) => {
     return;
   }
 
+  if (dragState.type === 'reorder-task') {
+    const dy = e.clientY - dragState.startY;
+    if (Math.abs(dy) > 4) dragState.hasMoved = true;
+    if (!dragState.hasMoved) return;
+
+    const svgRect = svgEl_root.getBoundingClientRect();
+    const svgY = e.clientY - svgRect.top;
+
+    const groupTasks = taskYPos.filter(tp => tp.gid === dragState.gid);
+    let targetSlot = groupTasks.length;
+    for (let i = 0; i < groupTasks.length; i++) {
+      if (svgY < groupTasks[i].y + groupTasks[i].h / 2) { targetSlot = i; break; }
+    }
+    dragState.currentIndex = targetSlot;
+
+    const indicatorY = targetSlot < groupTasks.length
+      ? groupTasks[targetSlot].y
+      : groupTasks[groupTasks.length - 1].y + groupTasks[groupTasks.length - 1].h;
+
+    if (!reorderIndicator) {
+      reorderIndicator = svgEl('line', {
+        x1: 0, y1: indicatorY, x2: svgEl_root.getAttribute('width'), y2: indicatorY,
+        stroke: '#2563eb', 'stroke-width': 2, 'pointer-events': 'none',
+      });
+      svgEl_root.appendChild(reorderIndicator);
+    } else {
+      reorderIndicator.setAttribute('y1', indicatorY);
+      reorderIndicator.setAttribute('y2', indicatorY);
+    }
+    return;
+  }
+
   const dx = e.clientX - dragState.startX;
   if (Math.abs(dx) > 5) dragState.hasMoved = true;
   if (!dragState.hasMoved) return;
@@ -743,7 +800,11 @@ svgEl_root.addEventListener('pointerup', async (e) => {
 
   if (reorderIndicator) { reorderIndicator.remove(); reorderIndicator = null; }
 
-  if (!ds.hasMoved) { openEditTaskModal(ds.tid); return; }
+  if (!ds.hasMoved) {
+    if (ds.type === 'reorder-task') return; // handle gesture on handle, not task bar
+    openEditTaskModal(ds.tid);
+    return;
+  }
 
   if (ds.type === 'reorder-group') {
     const ids = state.groups.map(g => g.id);
@@ -752,6 +813,20 @@ svgEl_root.addEventListener('pointerup', async (e) => {
     ids.splice(insertAt, 0, ds.gid);
     try {
       await api('POST', '/groups/reorder', { ids });
+      await loadRoadmap();
+    } catch (err) { showToast(err.message); render(); }
+    return;
+  }
+
+  if (ds.type === 'reorder-task') {
+    const group = state.groups.find(g => g.id === ds.gid);
+    if (!group) return;
+    const ids = group.tasks.map(t => t.id);
+    ids.splice(ds.origIndex, 1);
+    const insertAt = ds.currentIndex > ds.origIndex ? ds.currentIndex - 1 : ds.currentIndex;
+    ids.splice(insertAt, 0, ds.tid);
+    try {
+      await api('POST', `/groups/${ds.gid}/tasks/reorder`, { ids });
       await loadRoadmap();
     } catch (err) { showToast(err.message); render(); }
     return;

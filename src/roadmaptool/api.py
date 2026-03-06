@@ -138,6 +138,18 @@ def reorder_groups(body: ReorderBody):
     return {"ok": True}
 
 
+@router.post("/groups/{gid}/tasks/reorder")
+def reorder_tasks(gid: str, body: ReorderBody):
+    rm = _load()
+    group = next((g for g in rm.groups if g.id == gid), None)
+    if not group:
+        raise HTTPException(404, "group not found")
+    index = {t.id: t for t in group.tasks}
+    group.tasks = [index[i] for i in body.ids if i in index]
+    _save(rm)
+    return {"ok": True}
+
+
 # --- Tasks ---
 
 class TaskCreate(BaseModel):

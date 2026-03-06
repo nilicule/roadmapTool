@@ -51,16 +51,16 @@ groups:
   tasks:
   - id: dependency_vulnerability_scanning_1c3c81
     name: Dependency vulnerability scanning
-    start: '2026-04-01'
-    end: '2026-06-30'
+    start: '2026-04-03'
+    end: '2026-07-02'
     assignee:
     depends_on: []
     progress:
     tags: []
   - id: automated_sast_dast_4d368d
     name: Automated SAST/DAST
-    start: '2026-04-01'
-    end: '2026-06-30'
+    start: '2026-04-03'
+    end: '2026-07-02'
     assignee:
     depends_on: []
     progress:
