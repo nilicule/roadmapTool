@@ -1355,6 +1355,9 @@ document.getElementById('title-source-link').addEventListener('click', (e) => {
     undoStack.push(JSON.parse(JSON.stringify(state)));
     redoStack.length = 0;
     state = JSON.parse(JSON.stringify(urlState));
+    isReadOnly = true;
+    isFromUrl = true;
+    localStorage.setItem('roadmap_readonly_v1', 'true');
     saveState();
     render();
   }
