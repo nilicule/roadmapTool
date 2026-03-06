@@ -31,6 +31,7 @@ RELOAD=true uv run app
 - **Export PNG** — screenshot the SVG to a PNG file
 - **Read-only mode** — display a roadmap from a remote source URL without editing
 - **Templates** — start from a pre-built roadmap structure
+- **Dark mode** — sun/moon toggle in the toolbar switches between light and dark themes; preference is persisted to `localStorage` and respects the OS default on first visit
 
 ## Data Model
 

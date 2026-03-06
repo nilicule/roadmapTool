@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 uv sync --dev          # install all dependencies
-RELOAD=true uv run app # start dev server at http://localhost:8000 (hot reload enabled)
+RELOAD=true uv run app # start dev server at http://localhost:5006 (hot reload enabled)
 uv run pytest -v       # run all tests
 uv run pytest tests/test_models.py::test_valid_roadmap -v  # run a single test
 ```
