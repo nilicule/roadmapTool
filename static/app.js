@@ -1128,6 +1128,11 @@ function showTaskPopup(tid) {
   const assigneeEl = document.getElementById('task-popup-assignee');
   assigneeEl.textContent = task.assignee ? `👤 ${task.assignee}` : '';
 
+  // Notes preview
+  const notesEl = document.getElementById('task-popup-notes');
+  notesEl.textContent = task.notes ? task.notes.slice(0, 80) + (task.notes.length > 80 ? '…' : '') : '';
+  notesEl.style.display = task.notes ? '' : 'none';
+
   // Position: flush below the bar, aligned to bar left edge
   const left = pos.x - container.scrollLeft;
   const top = pos.y + pos.h + 2 - container.scrollTop;
@@ -1231,6 +1236,14 @@ function openModal(title, fields, onSave, onDelete = null) {
         .join('');
       div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
         <select id="field-${f.name}" name="${f.name}">${opts}</select>`;
+    } else if (f.type === 'multiselect') {
+      const items = (f.options || []).map(o => {
+        const checked = (f.value || []).includes(o.value) ? ' checked' : '';
+        return `<label class="multiselect-list__item"><input type="checkbox" name="${f.name}" value="${o.value}"${checked}> ${o.label}</label>`;
+      }).join('');
+      div.innerHTML = `<label>${f.label}</label>` +
+        (items ? `<div class="multiselect-list">${items}</div>`
+               : `<div class="multiselect-list--empty">No other tasks available</div>`);
     } else {
       div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
         <input id="field-${f.name}" name="${f.name}" type="${f.type || 'text'}"
@@ -1260,7 +1273,11 @@ function openModal(title, fields, onSave, onDelete = null) {
   document.getElementById('modal-form').onsubmit = async (e) => {
     e.preventDefault();
     try {
-      const data = Object.fromEntries(new FormData(e.target));
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      for (const f of fields) {
+        if (f.type === 'multiselect') data[f.name] = formData.getAll(f.name);
+      }
       await onSave(data);
       closeModal();
     } catch (err) {
@@ -1451,18 +1468,20 @@ function openEditTaskModal(tid) {
     for (const t of g.tasks)
       if (t.id !== tid && !wouldCreateCycle(t.id, tid))
         taskOptions.push({ value: t.id, label: `${g.name} / ${t.name}` });
-  const currentDep = (task.depends_on?.length > 0) ? task.depends_on[0] : '';
   openModal('Edit Task', [
     { name: 'name', label: 'Task name', value: task.name },
     { name: 'start', label: 'Start date', type: 'date', value: task.start },
     { name: 'end', label: 'End date', type: 'date', value: task.end },
     { name: 'assignee', label: 'Assignee', value: task.assignee || '', required: false },
-    { name: 'depends_on', label: 'Depends on', type: 'select', value: currentDep, options: taskOptions },
+    { name: 'notes', label: 'Notes', type: 'textarea', value: task.notes || '', required: false, placeholder: 'Optional description…' },
+    { name: 'depends_on', label: 'Depends on', type: 'multiselect', value: task.depends_on || [], options: taskOptions },
     { name: 'progress', label: 'Progress (%)', type: 'number', value: task.progress ?? '', required: false, placeholder: '0–100' },
     { name: 'tags', label: 'Tags', value: (task.tags || []).join(', '), required: false, placeholder: 'security, backend, ...' },
   ], (data) => {
-    if (data.depends_on && wouldCreateCycle(data.depends_on, tid))
-      throw new Error('This dependency would create a cycle');
+    const depIds = data.depends_on || [];
+    for (const depId of depIds) {
+      if (wouldCreateCycle(depId, tid)) throw new Error(`Dependency on "${depId}" would create a cycle`);
+    }
     mutate(() => {
       for (const g of state.groups) {
         const t = g.tasks.find(t => t.id === tid);
@@ -1471,7 +1490,8 @@ function openEditTaskModal(tid) {
           t.start = normalizeDate(data.start);
           t.end = normalizeDate(data.end, true);
           t.assignee = data.assignee || null;
-          t.depends_on = data.depends_on ? [data.depends_on] : [];
+          t.depends_on = depIds;
+          t.notes = data.notes?.trim() || null;
           t.progress = data.progress !== '' ? parseInt(data.progress) : null;
           t.tags = data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [];
           break;

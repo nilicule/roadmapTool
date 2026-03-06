@@ -11,6 +11,7 @@ class Task(BaseModel):
     start: date
     end: date
     assignee: str | None = None
+    notes: str | None = None
     depends_on: list[str] = []
     progress: int | None = None
     tags: list[str] = []
