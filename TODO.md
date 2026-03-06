@@ -6,10 +6,6 @@
 - [ ] Duplicate/copy task — no way to clone an existing task from the UI
 - [ ] Cross-group task move — drag a task row into a different group (currently same-group only)
 
-## Toolbar / Roadmap management
-
-- [ ] Roadmap date range editing from the UI — `PUT /roadmap` exists but there is no button/modal to change the global start/end dates or title
-
 ## Filtering & Search
 
 - [ ] Search tasks by name — text input that highlights or isolates matching tasks as you type
@@ -24,12 +20,3 @@
 - [ ] Workload summary panel — per-assignee count of tasks and aggregate % complete; answers "who is overloaded?"
 - [ ] Summary stats bar — headline numbers: total tasks, % complete, overdue count, days until end
 - [ ] Milestone list — dedicated sidebar or panel listing all milestones in date order with their status
-
-## Export
-
-- [ ] CSV / spreadsheet export — flat table of tasks for stakeholders who don't use YAML
-- [ ] PDF export — single-page landscape print-friendly output (SVG → PDF via browser print)
-
-## Multi-file / Project Management
-
-- [ ] Multiple roadmap files — currently hardcoded to a single `roadmap.yaml`; support named files or a project switcher backed by the local filesystem
