@@ -1237,6 +1237,7 @@ function openModal(title, fields, onSave, onDelete = null) {
     if (f.type === 'textarea') {
       div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
         <textarea id="field-${f.name}" name="${f.name}" placeholder="${f.placeholder || ''}" rows="8"></textarea>`;
+      div.querySelector('textarea').value = f.value || '';
     } else if (f.type === 'date') {
       div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
         <div style="display:flex;gap:4px;align-items:center">
