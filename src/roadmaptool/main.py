@@ -1,3 +1,4 @@
+import os
 import uvicorn
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -14,4 +15,5 @@ app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 
 def run():
-    uvicorn.run("roadmaptool.main:app", host="127.0.0.1", port=8000, reload=True)
+    reload = os.environ.get("RELOAD", "").lower() in ("1", "true", "yes")
+    uvicorn.run("roadmaptool.main:app", host="0.0.0.0", port=8000, reload=reload)

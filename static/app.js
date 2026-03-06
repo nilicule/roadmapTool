@@ -17,10 +17,10 @@ const ZOOM_LEVELS = [
 // ============================================================
 // State
 // ============================================================
+const STORAGE_KEY = 'roadmap_v1';
 let state = null;  // Roadmap object from API
 let undoStack = [];
 let redoStack = [];
-let _skipHistory = false;
 let zoomLevel = 0;    // index into ZOOM_LEVELS; 0 = Year (default)
 let dayW = 0;         // pixels per day (module-level, set in renderSVG)
 let timeStart = null; // Date object (module-level, set in renderSVG)
@@ -61,13 +61,30 @@ function isOverdue(t) {
 }
 
 // ============================================================
-// API
+// localStorage helpers
+// ============================================================
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function _slug(name) {
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const hex = Math.random().toString(16).slice(2, 8);
+  return `${base}_${hex}`;
+}
+
+function mutate(fn) {
+  undoStack.push(JSON.parse(JSON.stringify(state)));
+  redoStack.length = 0;
+  fn();
+  saveState();
+  render();
+}
+
+// ============================================================
+// API (import/export only)
 // ============================================================
 async function api(method, path, body, contentType = 'application/json') {
-  if (method !== 'GET' && state && !_skipHistory) {
-    undoStack.push(JSON.parse(JSON.stringify(state)));
-    redoStack.length = 0;
-  }
   const res = await fetch('/api' + path, {
     method,
     headers: body ? {'Content-Type': contentType} : {},
@@ -90,7 +107,10 @@ function scrollToToday() {
 
 let _firstLoad = true;
 async function loadRoadmap() {
-  state = await api('GET', '/roadmap');
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    state = JSON.parse(stored);
+  }
   render();
   if (_firstLoad) { _firstLoad = false; scrollToToday(); }
 }
@@ -540,24 +560,20 @@ function truncate(s, n) { return s.length <= n ? s : s.slice(0, n - 1) + '…'; 
 // ============================================================
 // Undo / Redo
 // ============================================================
-async function undo() {
+function undo() {
   if (!undoStack.length) return;
   redoStack.push(JSON.parse(JSON.stringify(state)));
-  const snapshot = undoStack.pop();
-  _skipHistory = true;
-  try { await api('PUT', '/roadmap/restore', snapshot); await loadRoadmap(); }
-  catch (err) { showToast(err.message); }
-  finally { _skipHistory = false; }
+  state = undoStack.pop();
+  saveState();
+  render();
 }
 
-async function redo() {
+function redo() {
   if (!redoStack.length) return;
   undoStack.push(JSON.parse(JSON.stringify(state)));
-  const snapshot = redoStack.pop();
-  _skipHistory = true;
-  try { await api('PUT', '/roadmap/restore', snapshot); await loadRoadmap(); }
-  catch (err) { showToast(err.message); }
-  finally { _skipHistory = false; }
+  state = redoStack.pop();
+  saveState();
+  render();
 }
 
 // ============================================================
@@ -811,10 +827,10 @@ svgEl_root.addEventListener('pointerup', async (e) => {
     ids.splice(ds.origIndex, 1);
     const insertAt = ds.currentIndex > ds.origIndex ? ds.currentIndex - 1 : ds.currentIndex;
     ids.splice(insertAt, 0, ds.gid);
-    try {
-      await api('POST', '/groups/reorder', { ids });
-      await loadRoadmap();
-    } catch (err) { showToast(err.message); render(); }
+    mutate(() => {
+      const index = Object.fromEntries(state.groups.map(g => [g.id, g]));
+      state.groups = ids.filter(id => id in index).map(id => index[id]);
+    });
     return;
   }
 
@@ -825,32 +841,28 @@ svgEl_root.addEventListener('pointerup', async (e) => {
     ids.splice(ds.origIndex, 1);
     const insertAt = ds.currentIndex > ds.origIndex ? ds.currentIndex - 1 : ds.currentIndex;
     ids.splice(insertAt, 0, ds.tid);
-    try {
-      await api('POST', `/groups/${ds.gid}/tasks/reorder`, { ids });
-      await loadRoadmap();
-    } catch (err) { showToast(err.message); render(); }
+    mutate(() => {
+      const grp = state.groups.find(g => g.id === ds.gid);
+      const index = Object.fromEntries(grp.tasks.map(t => [t.id, t]));
+      grp.tasks = ids.filter(id => id in index).map(id => index[id]);
+    });
     return;
   }
 
   const dx = e.clientX - ds.startX;
-  const task = findTask(ds.tid);
   const dayDelta = Math.round(dx / dayW);
 
   if (ds.type === 'move') {
     if (dayDelta === 0) { render(); return; }
-    // Shift moved task and all downstream tasks
     const downstream = getDownstream(ds.tid);
-    const snapshot = JSON.parse(JSON.stringify(state));
-    for (const g of snapshot.groups)
-      for (const t of g.tasks)
-        if (t.id === ds.tid || downstream.has(t.id)) {
-          t.start = shiftDate(t.start, dayDelta);
-          t.end   = shiftDate(t.end,   dayDelta);
-        }
-    try {
-      await api('PUT', '/roadmap/restore', snapshot);
-      await loadRoadmap();
-    } catch (err) { showToast(err.message); render(); }
+    mutate(() => {
+      for (const g of state.groups)
+        for (const t of g.tasks)
+          if (t.id === ds.tid || downstream.has(t.id)) {
+            t.start = shiftDate(t.start, dayDelta);
+            t.end   = shiftDate(t.end,   dayDelta);
+          }
+    });
     return;
   }
 
@@ -863,13 +875,10 @@ svgEl_root.addEventListener('pointerup', async (e) => {
     newEnd   = shiftDate(ds.origEnd, dayDelta);
   }
 
-  try {
-    await api('PUT', `/tasks/${ds.tid}`, { name: task.name, start: newStart, end: newEnd, assignee: task.assignee || null, depends_on: task.depends_on || [], progress: task.progress ?? null, tags: task.tags || [] });
-    await loadRoadmap();
-  } catch (err) {
-    showToast(err.message);
-    render();
-  }
+  mutate(() => {
+    const t = findTask(ds.tid);
+    if (t) { t.start = newStart; t.end = newEnd; }
+  });
 });
 
 svgEl_root.addEventListener('dblclick', (e) => {
@@ -894,8 +903,7 @@ svgEl_root.addEventListener('click', async (e) => {
       openAddGroupModal();
     } else if (action === 'toggle-group') {
       const g = state.groups.find(g => g.id === gid);
-      await api('PUT', `/groups/${gid}`, { name: g.name, color: g.color, collapsed: !g.collapsed, depends_on: g.depends_on || [] });
-      await loadRoadmap();
+      mutate(() => { g.collapsed = !g.collapsed; });
     } else if (action === 'edit-group') {
       openEditGroupModal(gid);
     } else if (action === 'add-task') {
@@ -1060,7 +1068,6 @@ function openModal(title, fields, onSave, onDelete = null) {
       try {
         await onDelete();
         closeModal();
-        await loadRoadmap();
       } catch (err) {
         showToast(err.message);
       }
@@ -1078,7 +1085,6 @@ function openModal(title, fields, onSave, onDelete = null) {
       const data = Object.fromEntries(new FormData(e.target));
       await onSave(data);
       closeModal();
-      await loadRoadmap();
     } catch (err) {
       showToast(err.message);
     }
@@ -1125,22 +1131,18 @@ document.addEventListener('keydown', async (e) => {
 
   if (e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && selectedTid) {
     e.preventDefault();
-    const task = findTask(selectedTid);
-    if (!task) return;
+    if (!findTask(selectedTid)) return;
     const delta = e.key === 'ArrowRight' ? 1 : -1;
     const downstream = getDownstream(selectedTid);
-    const snapshot = JSON.parse(JSON.stringify(state));
-    for (const g of snapshot.groups)
-      for (const t of g.tasks)
-        if (t.id === selectedTid || downstream.has(t.id)) {
-          t.start = shiftDate(t.start, delta);
-          t.end   = shiftDate(t.end,   delta);
-        }
-    try {
-      await api('PUT', '/roadmap/restore', snapshot);
-      await loadRoadmap();
-      scrollTaskIntoView(selectedTid);
-    } catch (err) { showToast(err.message); }
+    mutate(() => {
+      for (const g of state.groups)
+        for (const t of g.tasks)
+          if (t.id === selectedTid || downstream.has(t.id)) {
+            t.start = shiftDate(t.start, delta);
+            t.end   = shiftDate(t.end,   delta);
+          }
+    });
+    scrollTaskIntoView(selectedTid);
   }
 });
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
@@ -1159,8 +1161,10 @@ function openAddGroupModal() {
   openModal('Add Group', [
     { name: 'name', label: 'Group name', placeholder: 'e.g. Phase 1' },
     { name: 'color', label: 'Color', type: 'color', value: randomGroupColor() },
-  ], async (data) => {
-    await api('POST', '/groups', { name: data.name, color: data.color });
+  ], (data) => {
+    mutate(() => {
+      state.groups.push({ id: _slug(data.name), name: data.name, color: data.color, collapsed: false, tasks: [], depends_on: [] });
+    });
   });
 }
 
@@ -1174,14 +1178,16 @@ function openEditGroupModal(gid) {
     { name: 'name', label: 'Group name', value: g.name },
     { name: 'color', label: 'Color', type: 'color', value: g.color },
     { name: 'depends_on', label: 'Depends on', type: 'select', value: currentDep, options: groupOptions },
-  ], async (data) => {
-    await api('PUT', `/groups/${gid}`, {
-      name: data.name, color: data.color, collapsed: g.collapsed,
-      depends_on: data.depends_on ? [data.depends_on] : [],
+  ], (data) => {
+    mutate(() => {
+      const grp = state.groups.find(g => g.id === gid);
+      grp.name = data.name;
+      grp.color = data.color;
+      grp.depends_on = data.depends_on ? [data.depends_on] : [];
     });
-  }, async () => {
+  }, () => {
     if (confirm('Delete this group and all its tasks?')) {
-      await api('DELETE', `/groups/${gid}`);
+      mutate(() => { state.groups = state.groups.filter(g => g.id !== gid); });
     }
   });
 }
@@ -1197,12 +1203,17 @@ function openAddTaskModal(gid) {
     { name: 'assignee', label: 'Assignee', placeholder: 'e.g. Alice', required: false },
     { name: 'progress', label: 'Progress (%)', type: 'number', value: '', required: false, placeholder: '0–100' },
     { name: 'tags', label: 'Tags', placeholder: 'security, backend, ...', required: false, value: '' },
-  ], async (data) => {
-    await api('POST', `/groups/${gid}/tasks`, {
-      name: data.name, start: normalizeDate(data.start), end: normalizeDate(data.end, true),
-      assignee: data.assignee || null,
-      progress: data.progress !== '' ? parseInt(data.progress) : null,
-      tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
+  ], (data) => {
+    mutate(() => {
+      const g = state.groups.find(g => g.id === gid);
+      if (g) g.tasks.push({
+        id: _slug(data.name), name: data.name,
+        start: normalizeDate(data.start), end: normalizeDate(data.end, true),
+        assignee: data.assignee || null,
+        progress: data.progress !== '' ? parseInt(data.progress) : null,
+        tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
+        depends_on: [],
+      });
     });
   });
 }
@@ -1213,13 +1224,18 @@ function openAddMilestoneModal(gid) {
     { name: 'date', label: 'Date', type: 'date', value: state.start },
     { name: 'assignee', label: 'Assignee', placeholder: 'e.g. Alice', required: false },
     { name: 'tags', label: 'Tags', placeholder: 'launch, external, ...', required: false, value: '' },
-  ], async (data) => {
+  ], (data) => {
     const d = normalizeDate(data.date);
-    await api('POST', `/groups/${gid}/tasks`, {
-      name: data.name, start: d, end: d,
-      assignee: data.assignee || null,
-      progress: null,
-      tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
+    mutate(() => {
+      const g = state.groups.find(g => g.id === gid);
+      if (g) g.tasks.push({
+        id: _slug(data.name), name: data.name,
+        start: d, end: d,
+        assignee: data.assignee || null,
+        progress: null,
+        tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
+        depends_on: [],
+      });
     });
   });
 }
@@ -1238,17 +1254,16 @@ function openEditTaskModal(tid) {
       { name: 'date', label: 'Date', type: 'date', value: task.start },
       { name: 'assignee', label: 'Assignee', value: task.assignee || '', required: false },
       { name: 'tags', label: 'Tags', value: (task.tags || []).join(', '), required: false, placeholder: 'launch, external, ...' },
-    ], async (data) => {
+    ], (data) => {
       const d = normalizeDate(data.date);
-      await api('PUT', `/tasks/${tid}`, {
-        name: data.name, start: d, end: d,
-        assignee: data.assignee || null,
-        depends_on: task.depends_on || [],
-        progress: null,
-        tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
+      mutate(() => {
+        for (const g of state.groups) {
+          const t = g.tasks.find(t => t.id === tid);
+          if (t) { t.name = data.name; t.start = d; t.end = d; t.assignee = data.assignee || null; t.tags = data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : []; break; }
+        }
       });
-    }, async () => {
-      await api('DELETE', `/tasks/${tid}`);
+    }, () => {
+      mutate(() => { for (const g of state.groups) g.tasks = g.tasks.filter(t => t.id !== tid); });
     });
     return;
   }
@@ -1267,17 +1282,26 @@ function openEditTaskModal(tid) {
     { name: 'depends_on', label: 'Depends on', type: 'select', value: currentDep, options: taskOptions },
     { name: 'progress', label: 'Progress (%)', type: 'number', value: task.progress ?? '', required: false, placeholder: '0–100' },
     { name: 'tags', label: 'Tags', value: (task.tags || []).join(', '), required: false, placeholder: 'security, backend, ...' },
-  ], async (data) => {
+  ], (data) => {
     if (data.depends_on && wouldCreateCycle(data.depends_on, tid))
       throw new Error('This dependency would create a cycle');
-    await api('PUT', `/tasks/${tid}`, {
-      name: data.name, start: normalizeDate(data.start), end: normalizeDate(data.end, true), assignee: data.assignee || null,
-      depends_on: data.depends_on ? [data.depends_on] : [],
-      progress: data.progress !== '' ? parseInt(data.progress) : null,
-      tags: data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
+    mutate(() => {
+      for (const g of state.groups) {
+        const t = g.tasks.find(t => t.id === tid);
+        if (t) {
+          t.name = data.name;
+          t.start = normalizeDate(data.start);
+          t.end = normalizeDate(data.end, true);
+          t.assignee = data.assignee || null;
+          t.depends_on = data.depends_on ? [data.depends_on] : [];
+          t.progress = data.progress !== '' ? parseInt(data.progress) : null;
+          t.tags = data.tags ? data.tags.split(',').map(s => s.trim()).filter(Boolean) : [];
+          break;
+        }
+      }
     });
-  }, async () => {
-    await api('DELETE', `/tasks/${tid}`);
+  }, () => {
+    mutate(() => { for (const g of state.groups) g.tasks = g.tasks.filter(t => t.id !== tid); });
   });
 }
 
@@ -1311,18 +1335,32 @@ document.getElementById('btn-import').addEventListener('click', () => {
       text = await res.text();
     }
     if (!text) throw new Error('Provide YAML text or a URL');
-    await api('POST', '/roadmap/import', text, 'text/plain');
+    const validated = await api('POST', '/roadmap/import', text, 'text/plain');
+    undoStack.push(JSON.parse(JSON.stringify(state)));
+    redoStack.length = 0;
+    state = validated;
+    saveState();
+    render();
   });
 });
 
 document.getElementById('btn-edit-yaml').addEventListener('click', async () => {
   try {
-    const res = await fetch('/api/roadmap/export');
+    const res = await fetch('/api/roadmap/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    });
     const text = await res.text();
     openModal('Edit YAML', [
       { name: 'yaml', label: '', type: 'textarea' },
     ], async (data) => {
-      await api('POST', '/roadmap/import', data.yaml, 'text/plain');
+      const validated = await api('POST', '/roadmap/import', data.yaml, 'text/plain');
+      undoStack.push(JSON.parse(JSON.stringify(state)));
+      redoStack.length = 0;
+      state = validated;
+      saveState();
+      render();
     });
     document.getElementById('field-yaml').value = text;
   } catch (err) {
@@ -1352,7 +1390,11 @@ document.getElementById('btn-export-png').addEventListener('click', () => {
 
 document.getElementById('btn-export').addEventListener('click', async () => {
   try {
-    const res = await fetch('/api/roadmap/export');
+    const res = await fetch('/api/roadmap/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    });
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1374,7 +1416,12 @@ async function bootstrap() {
       const res = await fetch(remoteUrl);
       if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
       const text = await res.text();
-      await api('POST', '/roadmap/import', text, 'text/plain');
+      const validated = await fetch('/api/roadmap/import', {
+        method: 'POST', body: text,
+        headers: { 'Content-Type': 'text/plain' },
+      }).then(r => r.json());
+      state = validated;
+      saveState();
       history.replaceState(null, '', window.location.pathname);
     } catch (err) {
       showToast(`Failed to load from URL: ${err.message}`);
