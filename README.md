@@ -34,7 +34,7 @@ RELOAD=true uv run app
 
 ## Data Model
 
-The roadmap is stored as `roadmap.yaml`. The structure is:
+The roadmap is defined in YAML and managed entirely in the browser — there is no server-side persistence. State is kept in `localStorage` and can be imported from a local file or a remote URL.
 
 ```yaml
 title: My Roadmap
@@ -56,7 +56,7 @@ groups:
         notes: OAuth2 + JWT
 ```
 
-**Constraints enforced by the server:**
+**Constraints enforced on import:**
 
 - `id` fields must be lowercase alphanumeric + underscores
 - `color` must be a hex color (`#RRGGBB`)
@@ -64,7 +64,15 @@ groups:
 - Task IDs must be unique across the entire roadmap
 - `depends_on` must not form cycles
 
-The server picks up direct edits to `roadmap.yaml` on the next request — no restart needed.
+## Loading a Remote Roadmap
+
+Append `?url=` to the app URL to load a YAML file from a remote source:
+
+```
+http://localhost:5006/?url=https://example.com/roadmap.yaml
+```
+
+The app fetches the file, displays it in read-only mode, and remembers the source URL across page reloads. Editing is disabled while in read-only mode.
 
 ## Deployment
 
@@ -80,7 +88,7 @@ ROOT_PATH=/roadmap uv run app
 uv run pytest -v
 ```
 
-Tests use a temporary copy of `roadmap.yaml` and never touch the real file.
+Tests use temporary files.
 
 ## Architecture
 
@@ -88,7 +96,7 @@ Tests use a temporary copy of `roadmap.yaml` and never touch the real file.
 |---|---|
 | Backend | FastAPI + uvicorn |
 | Frontend | Vanilla JS SPA (no framework, no build step) |
-| Data | `roadmap.yaml` (ruamel.yaml) |
+| Data | Browser `localStorage` + YAML import/export (ruamel.yaml) |
 | Validation | Pydantic v2 |
 
 - `src/roadmaptool/main.py` — FastAPI app, mounts the API router and serves `static/` as the SPA root
