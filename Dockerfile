@@ -12,6 +12,8 @@ RUN uv sync --frozen --no-dev
 COPY src/ src/
 COPY static/ static/
 
+ENV ROOT_PATH=/roadmap
+
 EXPOSE 5006
 
 # Mount your roadmap.yaml over /app/roadmap.yaml to persist data:
