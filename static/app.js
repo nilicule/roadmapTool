@@ -1237,9 +1237,10 @@ function openModal(title, fields, onSave, onDelete = null) {
       div.innerHTML = `<label for="field-${f.name}">${f.label}</label>
         <select id="field-${f.name}" name="${f.name}">${opts}</select>`;
     } else if (f.type === 'multiselect') {
-      const items = (f.options || []).map(o => {
+      const items = (f.options || []).map((o, i) => {
         const checked = (f.value || []).includes(o.value) ? ' checked' : '';
-        return `<label class="multiselect-list__item"><input type="checkbox" name="${f.name}" value="${o.value}"${checked}> ${o.label}</label>`;
+        const uid = `ms-${f.name}-${i}`;
+        return `<div class="multiselect-list__item"><input type="checkbox" id="${uid}" name="${f.name}" value="${o.value}"${checked}><label for="${uid}">${o.label}</label></div>`;
       }).join('');
       div.innerHTML = `<label>${f.label}</label>` +
         (items ? `<div class="multiselect-list">${items}</div>`
@@ -1463,7 +1464,7 @@ function openEditTaskModal(tid) {
     return;
   }
 
-  const taskOptions = [{ value: '', label: '(none)' }];
+  const taskOptions = [];
   for (const g of state.groups)
     for (const t of g.tasks)
       if (t.id !== tid && !wouldCreateCycle(t.id, tid))

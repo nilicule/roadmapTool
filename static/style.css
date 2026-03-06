@@ -197,14 +197,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 .multiselect-list {
   max-height: 130px; overflow-y: auto;
   border: 1px solid #ccc; border-radius: 6px;
-  padding: 4px 8px;
+  padding: 2px 4px;
 }
 .multiselect-list__item {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 14px; padding: 3px 0; cursor: pointer; user-select: none;
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px; border-radius: 4px; cursor: pointer;
 }
-.multiselect-list__item input { cursor: pointer; }
-.multiselect-list--empty { color: #9ca3af; font-size: 13px; padding: 6px 0; }
+.multiselect-list__item:hover { background: #f3f4f6; }
+.multiselect-list__item input[type="checkbox"] {
+  width: 14px; height: 14px; flex-shrink: 0;
+  cursor: pointer; accent-color: #2563eb; margin: 0;
+}
+.multiselect-list__item label {
+  font-size: 14px; font-weight: normal; margin-bottom: 0;
+  cursor: pointer; user-select: none;
+}
+.multiselect-list--empty { color: #9ca3af; font-size: 13px; padding: 6px 8px; }
 
 #task-popup-notes {
   color: #6b7280; font-size: 12px; margin-top: 4px;
