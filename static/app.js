@@ -1170,13 +1170,13 @@ function showTaskPopup(tid) {
 
   // Notes preview
   const notesEl = document.getElementById('task-popup-notes');
-  notesEl.textContent = task.notes ? task.notes.slice(0, 80) + (task.notes.length > 80 ? '…' : '') : '';
+  notesEl.textContent = task.notes ?? '';
   notesEl.style.display = task.notes ? '' : 'none';
 
   // Position: flush below the bar, aligned to bar left edge
   const left = pos.x - container.scrollLeft;
   const top = pos.y + pos.h + 2 - container.scrollTop;
-  const maxLeft = container.clientWidth - 280;
+  const maxLeft = container.clientWidth - 320;
   popup.style.left = `${Math.max(0, Math.min(left, maxLeft))}px`;
   popup.style.top = `${top}px`;
 
